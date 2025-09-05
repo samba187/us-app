@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import styled from 'styled-components';
+import './App.css';
 
 // Components
 import Login from './components/Login';
@@ -105,7 +106,6 @@ function App() {
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/photos" element={<Photos />} />
             <Route path="/notes" element={<Notes />} />
-    <Route path="/onboarding-couple" element={<OnboardingCouple />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </MainContent>
