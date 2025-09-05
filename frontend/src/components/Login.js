@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import styled from 'styled-components';
-import { authService } from '../services/authService';
+import { authService, coupleService } from '../services/authService';
 
 const LoginContainer = styled.div`
   min-height: 100vh;
@@ -124,7 +124,26 @@ function Login({ onLogin }) {
         response = await authService.register(formData.name, formData.email, formData.password);
       }
       
+      // Marquer l'utilisateur comme connecté AVANT de vérifier le couple
       onLogin(response.token, response.user);
+      
+      // Vérifier le statut couple après un petit délai pour laisser le state se mettre à jour
+      setTimeout(async () => {
+        try {
+          const coupleStatus = await coupleService.me();
+          if (coupleStatus.status === 'single') {
+            // Rediriger vers onboarding couple
+            window.location.href = '/onboarding-couple';
+            return;
+          }
+        } catch (coupleError) {
+          // Si erreur 409, l'intercepteur redirigera automatiquement
+          if (coupleError.response?.status === 409) {
+            return;
+          }
+        }
+      }, 100);
+      
     } catch (error) {
       setError(error.response?.data?.message || 'Une erreur est survenue');
     }

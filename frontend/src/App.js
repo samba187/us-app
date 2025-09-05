@@ -12,6 +12,7 @@ import Activities from './pages/Activities';
 import Wishlist from './pages/Wishlist';
 import Photos from './pages/Photos';
 import Notes from './pages/Notes';
+import OnboardingCouple from './pages/OnboardingCouple';
 
 // Services
 // import { authService } from './services/authService';
@@ -97,6 +98,7 @@ function App() {
         <MainContent>
           <Routes>
             <Route path="/" element={<Home user={user} />} />
+            <Route path="/onboarding-couple" element={<OnboardingCouple />} />
             <Route path="/reminders" element={<Reminders />} />
             <Route path="/restaurants" element={<Restaurants />} />
             <Route path="/activities" element={<Activities />} />
@@ -106,7 +108,8 @@ function App() {
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </MainContent>
-        <Navigation onLogout={handleLogout} />
+        {/* Ne pas afficher la navigation sur la page onboarding */}
+        {window.location.pathname !== '/onboarding-couple' && <Navigation onLogout={handleLogout} />}
       </Router>
     </AppContainer>
   );

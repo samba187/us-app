@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiBell, FiCalendar, FiHeart, FiMapPin } from 'react-icons/fi';
-import { reminderService, restaurantService, activityService, wishlistService, authService } from '../services/authService';
+import { reminderService, restaurantService, activityService, wishlistService, authService, coupleService } from '../services/authService';
 
 const HomeContainer = styled.div`
   padding: 20px;
@@ -171,8 +171,22 @@ function Home({ user }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    checkCoupleStatus();
     loadData();
   }, []);
+
+  const checkCoupleStatus = async () => {
+    try {
+      const coupleStatus = await coupleService.me();
+      if (coupleStatus.status === 'single') {
+        window.location.href = '/onboarding-couple';
+        return;
+      }
+    } catch (error) {
+      // Si erreur 409, l'intercepteur redirigera automatiquement
+      console.log('Couple status check error:', error);
+    }
+  };
 
   const loadData = async () => {
     try {
