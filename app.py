@@ -114,7 +114,9 @@ def iso_to_dt(val):
 @app.get("/")
 def root():
     return jsonify({"status": "ok", "app": "Base de couple API", "docs": "/api/health"})
-
+@app.get("/health")
+def health_root():
+    return {"status": "ok", "scope": "root"}
 @app.get("/api/health")
 def health():
     # On tente les index une seule fois au premier hit (si la DB est up)
