@@ -1,4 +1,4 @@
-// src/api/index.js (ou src/authService.js selon ton projet)
+// frontend/src/services/authService.js
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -8,25 +8,26 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Token
+// ---- Token sur chaque requête
 api.interceptors.request.use((config) => {
-  const t = localStorage.getItem('us_token');
-  if (t) config.headers.Authorization = `Bearer ${t}`;
+  const token = localStorage.getItem('us_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Erreurs globales
+// ---- Gestion 401 / 409 globalement
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    const s = error.response?.status;
-    const d = error.response?.data;
-    if (s === 401) {
+    const status = error.response?.status;
+    const data = error.response?.data;
+
+    if (status === 401) {
       localStorage.removeItem('us_token');
       localStorage.removeItem('us_user');
       window.location.href = '/';
     }
-    if (s === 409 && d?.error === 'not_in_couple') {
+    if (status === 409 && data?.error === 'not_in_couple') {
       if (window.location.pathname !== '/onboarding-couple') {
         window.location.href = '/onboarding-couple';
       }
@@ -35,18 +36,66 @@ api.interceptors.response.use(
   }
 );
 
-// --- Services ---
+// ---- Auth
 export const authService = {
   login: async (email, password) => (await api.post('/login', { email, password })).data,
   register: async (name, email, password) =>
     (await api.post('/register', { name, email, password })).data,
+  getUsers: async () => (await api.get('/users')).data,
 };
 
+// ---- Couple
 export const coupleService = {
   me: async () => (await api.get('/couple/me')).data,
   create: async () => (await api.post('/couple/create')).data,
   join: async (invite_code) => (await api.post('/couple/join', { invite_code })).data,
   refreshInvite: async () => (await api.post('/couple/invite/refresh')).data,
+};
+
+// ---- Reminders
+export const reminderService = {
+  getAll: async () => (await api.get('/reminders')).data,
+  create: async (reminder) => (await api.post('/reminders', reminder)).data,
+  update: async (id, updates) => (await api.put(`/reminders/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/reminders/${id}`)).data,
+};
+
+// ---- Restaurants
+export const restaurantService = {
+  getAll: async () => (await api.get('/restaurants')).data,
+  create: async (restaurant) => (await api.post('/restaurants', restaurant)).data,
+  update: async (id, updates) => (await api.put(`/restaurants/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/restaurants/${id}`)).data,
+};
+
+// ---- Activities
+export const activityService = {
+  getAll: async () => (await api.get('/activities')).data,
+  create: async (activity) => (await api.post('/activities', activity)).data,
+  update: async (id, updates) => (await api.put(`/activities/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/activities/${id}`)).data,
+};
+
+// ---- Wishlist
+export const wishlistService = {
+  getAll: async () => (await api.get('/wishlist')).data,
+  create: async (item) => (await api.post('/wishlist', item)).data,
+  update: async (id, updates) => (await api.put(`/wishlist/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/wishlist/${id}`)).data,
+};
+
+// ---- Photos
+export const photoService = {
+  getAll: async () => (await api.get('/photos')).data,
+  create: async (photo) => (await api.post('/photos', photo)).data,
+};
+
+// ---- Notes
+export const noteService = {
+  getAll: async () => (await api.get('/notes')).data,
+  create: async (note) => (await api.post('/notes', note)).data,
+  update: async (id, updates) => (await api.put(`/notes/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/notes/${id}`)).data,
 };
 
 export default api;
