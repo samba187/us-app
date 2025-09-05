@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { authService, coupleService } from '../'; // adapte le chemin si besoin
+import { authService, coupleService } from '../services/authService'; // adapte le chemin si besoin
 
 export default function Login() {
   const [email, setEmail] = useState('');
