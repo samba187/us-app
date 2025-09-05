@@ -1,3 +1,4 @@
+// src/api/index.js (ou src/authService.js selon ton projet)
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
@@ -7,25 +8,25 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Ajouter le token
+// Token
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('us_token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const t = localStorage.getItem('us_token');
+  if (t) config.headers.Authorization = `Bearer ${t}`;
   return config;
 });
 
-// Gérer erreurs globales
+// Erreurs globales
 api.interceptors.response.use(
   (res) => res,
   (error) => {
-    if (error.response?.status === 401) {
+    const s = error.response?.status;
+    const d = error.response?.data;
+    if (s === 401) {
       localStorage.removeItem('us_token');
       localStorage.removeItem('us_user');
       window.location.href = '/';
     }
-    if (error.response?.status === 409 && error.response?.data?.error === 'not_in_couple') {
+    if (s === 409 && d?.error === 'not_in_couple') {
       if (window.location.pathname !== '/onboarding-couple') {
         window.location.href = '/onboarding-couple';
       }
@@ -34,11 +35,11 @@ api.interceptors.response.use(
   }
 );
 
+// --- Services ---
 export const authService = {
   login: async (email, password) => (await api.post('/login', { email, password })).data,
   register: async (name, email, password) =>
     (await api.post('/register', { name, email, password })).data,
-  getUsers: async () => (await api.get('/users')).data,
 };
 
 export const coupleService = {
