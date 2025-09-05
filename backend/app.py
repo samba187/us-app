@@ -13,7 +13,32 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Configuration CORS complète
+CORS(app, 
+     origins=["*"],  # Permet tous les domaines
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     supports_credentials=True
+)
+
+# Middleware pour ajouter les headers CORS à toutes les réponses
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    return response
+
+# Route OPTIONS pour préflight
+@app.route('/api/<path:path>', methods=['OPTIONS'])
+def handle_options(path):
+    response = jsonify({'status': 'ok'})
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
 
 # Configuration MongoDB
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
