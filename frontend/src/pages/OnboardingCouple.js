@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { coupleService } from '../api';
+import { coupleService } from '../services/authService';
 
 export default function OnboardingCouple() {
   const [code, setCode] = useState('');
