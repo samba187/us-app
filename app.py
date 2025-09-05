@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from functools import wraps
 from bson import ObjectId
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, make_response
 from flask_cors import CORS
 from flask_pymongo import PyMongo
 from dotenv import load_dotenv
@@ -17,17 +17,32 @@ app = Flask(__name__)
 # === Config ===
 app.config["MONGO_URI"] = os.getenv("MONGO_URI")  # ex: mongodb+srv://user:pwd@cluster/db?retryWrites=true&w=majority
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "change-me")
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", "http://localhost:3000")
 
-# CORS: autorise précisément ton front (Netlify) + localhost
-CORS(app, resources={
-    r"/api/*": {
-        "origins": [FRONTEND_ORIGIN, "http://localhost:3000", "http://127.0.0.1:3000"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
-        "supports_credentials": False  # ne pas mettre True avec plusieurs origines
-    }
-})
+# CORS: Configuration complète pour production et développement
+CORS(app, 
+     origins=["*"],  # Permet tous les domaines pour éviter les problèmes
+     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
+     supports_credentials=False
+)
+
+# Headers CORS additionnels
+@app.after_request
+def after_request(response):
+    response.headers.add('Access-Control-Allow-Origin', '*')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Requested-With')
+    response.headers.add('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS')
+    return response
+
+# Gestion des requêtes OPTIONS pour préflight
+@app.before_request
+def handle_preflight():
+    if request.method == "OPTIONS":
+        response = make_response()
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add('Access-Control-Allow-Headers', "Content-Type,Authorization,X-Requested-With")
+        response.headers.add('Access-Control-Allow-Methods', "GET,PUT,POST,DELETE,OPTIONS")
+        return response
 
 mongo = PyMongo(app)
 
