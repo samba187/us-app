@@ -32,6 +32,9 @@ api.interceptors.response.use(
       localStorage.removeItem('us_token');
       localStorage.removeItem('us_user');
       window.location.href = '/';
+    } else if (error.response?.status === 409) {
+      // Erreur couple - rediriger vers onboarding
+      window.location.href = '/onboarding-couple';
     }
     return Promise.reject(error);
   }
@@ -50,6 +53,23 @@ export const authService = {
 
   getUsers: async () => {
     const response = await api.get('/users');
+    return response.data;
+  },
+};
+
+export const coupleService = {
+  me: async () => {
+    const response = await api.get('/couple/me');
+    return response.data;
+  },
+
+  create: async () => {
+    const response = await api.post('/couple/create');
+    return response.data;
+  },
+
+  join: async (code) => {
+    const response = await api.post('/couple/join', { code });
     return response.data;
   },
 };
