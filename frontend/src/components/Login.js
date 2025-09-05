@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { authService, coupleService } from '../api';
+import { authService, coupleService } from '../api'; // adapte le chemin si besoin
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -14,32 +14,23 @@ export default function Login() {
       localStorage.setItem('us_token', access_token);
       localStorage.setItem('us_user', JSON.stringify(user));
 
-      // Vérifie état couple
-      const cm = await coupleService.me();
+      const cm = await coupleService.me();       // ✅ vérifie l’état couple
       if (!cm.in_couple) {
         window.location.href = '/onboarding-couple';
       } else {
         window.location.href = '/';
       }
-    } catch (err) {
+    } catch {
       setError('Identifiants invalides');
     }
   };
 
   return (
-    <div>
-      <h2>Connexion</h2>
-      <form onSubmit={handleLogin}>
-        <input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email" />
-        <input
-          type="password"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Mot de passe"
-        />
-        <button type="submit">Se connecter</button>
-      </form>
-      {error && <p style={{ color: 'crimson' }}>{error}</p>}
-    </div>
+    <form onSubmit={handleLogin}>
+      <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="Email" />
+      <input type="password" value={password} onChange={(e)=>setPassword(e.target.value)} placeholder="Mot de passe" />
+      <button type="submit">Se connecter</button>
+      {error && <p style={{color:'crimson'}}>{error}</p>}
+    </form>
   );
 }
