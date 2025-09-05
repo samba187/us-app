@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FiBell, FiCalendar, FiHeart, FiMapPin, FiUsers } from 'react-icons/fi';
+import { FiBell, FiCalendar, FiHeart, FiMapPin } from 'react-icons/fi';
 import { reminderService, restaurantService, activityService, wishlistService, authService } from '../services/authService';
 
 const HomeContainer = styled.div`
