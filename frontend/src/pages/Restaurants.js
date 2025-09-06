@@ -232,18 +232,69 @@ const SecondaryButton = styled(Button)`
   color: var(--text-color);
 `;
 
+const EditDeleteRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+`;
+
+const EditButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #4ecdc4;
+  border-radius: 6px;
+  background: white;
+  color: #4ecdc4;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #4ecdc4;
+    color: white;
+  }
+`;
+
+const DeleteButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ff6b8a;
+  border-radius: 6px;
+  background: white;
+  color: #ff6b8a;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #ff6b8a;
+    color: white;
+  }
+`;
+
+const FileInput = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
 function Restaurants() {
   const [restaurants, setRestaurants] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingRestaurant, setEditingRestaurant] = useState(null);
   const [formData, setFormData] = useState({
     name: '',
     address: '',
     map_url: '',
-    image_url: '',
-    notes: ''
+    notes: '',
+    files: null
   });
 
   useEffect(() => {
@@ -277,12 +328,72 @@ function Restaurants() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await restaurantService.create(formData);
+      let imageUrls = [];
+      
+      if (formData.files && formData.files.length > 0) {
+        const uploadData = new FormData();
+        for (let file of formData.files) {
+          uploadData.append('files', file);
+        }
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('us_token')}`
+          },
+          body: uploadData
+        });
+        
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          imageUrls = uploadResult.files || [];
+        }
+      }
+
+      const restaurantData = {
+        name: formData.name,
+        address: formData.address,
+        map_url: formData.map_url,
+        notes: formData.notes,
+        images: imageUrls,
+        image_url: imageUrls[0] || ''
+      };
+
+      if (editingRestaurant) {
+        await restaurantService.update(editingRestaurant._id, restaurantData);
+      } else {
+        await restaurantService.create(restaurantData);
+      }
+      
       setShowModal(false);
-      setFormData({ name: '', address: '', map_url: '', image_url: '', notes: '' });
+      setEditingRestaurant(null);
+      setFormData({ name: '', address: '', map_url: '', notes: '', files: null });
       loadRestaurants();
     } catch (error) {
-      console.error('Erreur lors de la création du restaurant:', error);
+      console.error('Erreur:', error);
+    }
+  };
+
+  const handleEdit = (restaurant) => {
+    setEditingRestaurant(restaurant);
+    setFormData({
+      name: restaurant.name,
+      address: restaurant.address || '',
+      map_url: restaurant.map_url || '',
+      notes: restaurant.notes || '',
+      files: null
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Supprimer ce restaurant ?')) {
+      try {
+        await restaurantService.delete(id);
+        loadRestaurants();
+      } catch (error) {
+        console.error('Erreur suppression:', error);
+      }
     }
   };
 
@@ -327,7 +438,11 @@ function Restaurants() {
     <RestaurantsContainer className="fade-in">
       <Header>
         <Title>Restaurants</Title>
-        <AddButton onClick={() => setShowModal(true)}>
+        <AddButton onClick={() => {
+          setEditingRestaurant(null);
+          setFormData({ name: '', address: '', map_url: '', notes: '', files: null });
+          setShowModal(true);
+        }}>
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
@@ -388,6 +503,15 @@ function Restaurants() {
                 Favori
               </ActionButton>
             </RestaurantActions>
+            
+            <EditDeleteRow>
+              <EditButton onClick={() => handleEdit(restaurant)}>
+                Modifier
+              </EditButton>
+              <DeleteButton onClick={() => handleDelete(restaurant._id)}>
+                Supprimer
+              </DeleteButton>
+            </EditDeleteRow>
           </RestaurantContent>
         </RestaurantCard>
       ))}
@@ -400,7 +524,7 @@ function Restaurants() {
 
       <Modal show={showModal} onClick={() => setShowModal(false)}>
         <ModalContent onClick={(e) => e.stopPropagation()}>
-          <ModalTitle>Nouveau restaurant</ModalTitle>
+          <ModalTitle>{editingRestaurant ? 'Modifier le restaurant' : 'Nouveau restaurant'}</ModalTitle>
           <Form onSubmit={handleSubmit}>
             <Input
               type="text"
@@ -424,11 +548,11 @@ function Restaurants() {
               onChange={(e) => setFormData({...formData, map_url: e.target.value})}
             />
             
-            <Input
-              type="url"
-              placeholder="URL de l'image (optionnel)"
-              value={formData.image_url}
-              onChange={(e) => setFormData({...formData, image_url: e.target.value})}
+            <FileInput
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setFormData({...formData, files: e.target.files})}
             />
             
             <TextArea
@@ -442,7 +566,7 @@ function Restaurants() {
                 Annuler
               </SecondaryButton>
               <PrimaryButton type="submit">
-                Ajouter
+                {editingRestaurant ? 'Modifier' : 'Ajouter'}
               </PrimaryButton>
             </FormButtons>
           </Form>
