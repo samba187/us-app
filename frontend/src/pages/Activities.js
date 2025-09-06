@@ -152,6 +152,156 @@ const ActionButton = styled.button`
   }
 `;
 
+const EditDeleteRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+`;
+
+const EditButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #4ecdc4;
+  border-radius: 6px;
+  background: white;
+  color: #4ecdc4;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #4ecdc4;
+    color: white;
+  }
+`;
+
+const DeleteButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ff6b8a;
+  border-radius: 6px;
+  background: white;
+  color: #ff6b8a;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #ff6b8a;
+    color: white;
+  }
+`;
+
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: ${props => props.show ? 'flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+`;
+
+const ModalTitle = styled.h2`
+  margin-bottom: 20px;
+  color: var(--text-color);
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const Input = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const TextArea = styled.textarea`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const Select = styled.select`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  background: white;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FileInput = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FormButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+`;
+
+const Button = styled.button`
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+`;
+
+const PrimaryButton = styled(Button)`
+  background: linear-gradient(135deg, #ff6b8a, #4ecdc4);
+  color: white;
+`;
+
+const SecondaryButton = styled(Button)`
+  background: var(--border-color);
+  color: var(--text-color);
+`;
+
 function getCategoryGradient(category) {
   const gradients = {
     fun: 'linear-gradient(135deg, #ff6b8a, #4ecdc4)',
@@ -181,6 +331,14 @@ function Activities() {
   const [filteredActivities, setFilteredActivities] = useState([]);
   const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingActivity, setEditingActivity] = useState(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    category: 'other',
+    notes: '',
+    files: null
+  });
 
   useEffect(() => {
     loadActivities();
@@ -219,6 +377,76 @@ function Activities() {
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      let imageUrls = [];
+      
+      if (formData.files && formData.files.length > 0) {
+        const uploadData = new FormData();
+        for (let file of formData.files) {
+          uploadData.append('files', file);
+        }
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('us_token')}`
+          },
+          body: uploadData
+        });
+        
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          imageUrls = uploadResult.files || [];
+        }
+      }
+
+      const activityData = {
+        title: formData.title,
+        category: formData.category,
+        notes: formData.notes,
+        images: imageUrls,
+        image_url: imageUrls[0] || ''
+      };
+
+      if (editingActivity) {
+        await activityService.update(editingActivity._id, activityData);
+      } else {
+        await activityService.create(activityData);
+      }
+      
+      setShowModal(false);
+      setEditingActivity(null);
+      setFormData({ title: '', category: 'other', notes: '', files: null });
+      loadActivities();
+    } catch (error) {
+      console.error('Erreur:', error);
+    }
+  };
+
+  const handleEdit = (activity) => {
+    setEditingActivity(activity);
+    setFormData({
+      title: activity.title,
+      category: activity.category,
+      notes: activity.notes || '',
+      files: null
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Supprimer cette activité ?')) {
+      try {
+        await activityService.delete(id);
+        loadActivities();
+      } catch (error) {
+        console.error('Erreur suppression:', error);
+      }
+    }
+  };
+
   const getStatusLabel = (status) => {
     switch (status) {
       case 'planned': return 'Prévue';
@@ -242,7 +470,11 @@ function Activities() {
     <ActivitiesContainer className="fade-in">
       <Header>
         <Title>Activités</Title>
-        <AddButton>
+        <AddButton onClick={() => {
+          setEditingActivity(null);
+          setFormData({ title: '', category: 'other', notes: '', files: null });
+          setShowModal(true);
+        }}>
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
@@ -301,6 +533,15 @@ function Activities() {
                 Faite
               </ActionButton>
             </ActivityActions>
+            
+            <EditDeleteRow>
+              <EditButton onClick={() => handleEdit(activity)}>
+                Modifier
+              </EditButton>
+              <DeleteButton onClick={() => handleDelete(activity._id)}>
+                Supprimer
+              </DeleteButton>
+            </EditDeleteRow>
           </ActivityContent>
         </ActivityCard>
       ))}
@@ -310,6 +551,55 @@ function Activities() {
           {filter === 'all' ? 'Aucune activité pour le moment' : `Aucune activité ${getStatusLabel(filter).toLowerCase()}`}
         </div>
       )}
+
+      <Modal show={showModal} onClick={() => setShowModal(false)}>
+        <ModalContent onClick={(e) => e.stopPropagation()}>
+          <ModalTitle>{editingActivity ? 'Modifier l\'activité' : 'Nouvelle activité'}</ModalTitle>
+          <Form onSubmit={handleSubmit}>
+            <Input
+              type="text"
+              placeholder="Titre de l'activité"
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              required
+            />
+            
+            <Select
+              value={formData.category}
+              onChange={(e) => setFormData({...formData, category: e.target.value})}
+            >
+              <option value="fun">Fun</option>
+              <option value="romantic">Romantique</option>
+              <option value="sport">Sport</option>
+              <option value="culture">Culture</option>
+              <option value="travel">Voyage</option>
+              <option value="other">Autre</option>
+            </Select>
+            
+            <TextArea
+              placeholder="Notes, description..."
+              value={formData.notes}
+              onChange={(e) => setFormData({...formData, notes: e.target.value})}
+            />
+            
+            <FileInput
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setFormData({...formData, files: e.target.files})}
+            />
+            
+            <FormButtons>
+              <SecondaryButton type="button" onClick={() => setShowModal(false)}>
+                Annuler
+              </SecondaryButton>
+              <PrimaryButton type="submit">
+                {editingActivity ? 'Modifier' : 'Créer'}
+              </PrimaryButton>
+            </FormButtons>
+          </Form>
+        </ModalContent>
+      </Modal>
     </ActivitiesContainer>
   );
 }

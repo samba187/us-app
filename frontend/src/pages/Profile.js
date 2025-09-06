@@ -24,9 +24,8 @@ export default function Profile({onLogout}){
         <div style={{fontSize:14,marginBottom:6}}>Code d'invitation à partager :</div>
         <CodeBox>{inviteCode}</CodeBox>
       </div>}
-      <div style={{marginTop:28,display:'flex',gap:12}}>
-        <Btn onClick={()=>{localStorage.removeItem('us_token');localStorage.removeItem('us_user');window.location.href='/'}}>Déconnexion</Btn>
-        <Btn variant="danger" onClick={()=>{if(window.confirm('Se déconnecter ?')){localStorage.removeItem('us_token');localStorage.removeItem('us_user');window.location.href='/'}}}>Logout</Btn>
+      <div style={{marginTop:28}}>
+        <Btn variant="danger" onClick={()=>{if(window.confirm('Se déconnecter ?')){localStorage.removeItem('us_token');localStorage.removeItem('us_user');window.location.href='/'}}}>Déconnexion</Btn>
       </div>
     </Card>
   </Wrap>;

@@ -6,6 +6,7 @@ import './App.css';
 // Components
 import Login from './components/Login';
 import Navigation from './components/Navigation';
+import PWAGuide from './components/PWAGuide';
 import Home from './pages/Home';
 import Reminders from './pages/Reminders';
 import Restaurants from './pages/Restaurants';
@@ -112,10 +113,9 @@ function App() {
           </Routes>
         </MainContent>
         {/* Ne pas afficher la navigation sur la page onboarding */}
-  {window.location.pathname !== '/onboarding-couple' && <Navigation />}
+        {window.location.pathname !== '/onboarding-couple' && <Navigation />}
+        <PWAGuide />
       </Router>
     </AppContainer>
   );
-}
-
-export default App;
+}export default App;

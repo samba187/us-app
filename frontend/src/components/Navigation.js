@@ -140,12 +140,12 @@ function Navigation() {
   ];
 
   const addMenuItems = [
-    { label: 'Nouveau rappel', icon: FiBell, action: () => console.log('Nouveau rappel') },
-    { label: 'Nouveau resto', icon: FiMapPin, action: () => console.log('Nouveau resto') },
-    { label: 'Nouvelle activité', icon: FiCalendar, action: () => console.log('Nouvelle activité') },
-    { label: 'Nouveau souhait', icon: FiHeart, action: () => console.log('Nouveau souhait') },
-    { label: 'Nouvelle photo', icon: FiCamera, action: () => console.log('Nouvelle photo') },
-    { label: 'Nouvelle note', icon: FiFileText, action: () => console.log('Nouvelle note') },
+    { label: 'Nouveau rappel', icon: FiBell, action: () => window.location.href = '/reminders' },
+    { label: 'Nouveau resto', icon: FiMapPin, action: () => window.location.href = '/restaurants' },
+    { label: 'Nouvelle activité', icon: FiCalendar, action: () => window.location.href = '/activities' },
+    { label: 'Nouveau souhait', icon: FiHeart, action: () => window.location.href = '/wishlist' },
+    { label: 'Nouvelle photo', icon: FiCamera, action: () => window.location.href = '/photos' },
+    { label: 'Nouvelle note', icon: FiFileText, action: () => window.location.href = '/notes' },
   ];
 
   return (

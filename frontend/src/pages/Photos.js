@@ -174,13 +174,158 @@ const EmptyIcon = styled.div`
   opacity: 0.3;
 `;
 
+const AddModal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: ${props => props.show ? 'flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+`;
+
+const ModalTitle = styled.h2`
+  margin-bottom: 20px;
+  color: var(--text-color);
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const Input = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FileInput = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FormButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+`;
+
+const Button = styled.button`
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+`;
+
+const PrimaryButton = styled(Button)`
+  background: linear-gradient(135deg, #ff6b8a, #4ecdc4);
+  color: white;
+`;
+
+const SecondaryButton = styled(Button)`
+  background: var(--border-color);
+  color: var(--text-color);
+`;
+
+const FilterTabs = styled.div`
+  display: flex;
+  background: white;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+`;
+
+const FilterTab = styled.button`
+  flex-shrink: 0;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 8px;
+  background: ${props => props.active ? 'var(--primary-color)' : 'transparent'};
+  color: ${props => props.active ? 'white' : 'var(--text-color)'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 12px;
+  white-space: nowrap;
+`;
+
+const CreateAlbumButton = styled.button`
+  flex-shrink: 0;
+  padding: 8px 12px;
+  border: 1px dashed var(--primary-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--primary-color);
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+`;
+
+const Select = styled.select`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  background: white;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
 function Photos() {
   const [photos, setPhotos] = useState([]);
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [formData, setFormData] = useState({
+    caption: '',
+    album_id: '',
+    files: null
+  });
+  const [albums, setAlbums] = useState([]);
+  const [currentAlbum, setCurrentAlbum] = useState('all');
+  const [showAlbumModal, setShowAlbumModal] = useState(false);
+  const [newAlbumName, setNewAlbumName] = useState('');
 
   useEffect(() => {
     loadPhotos();
+    loadAlbums();
   }, []);
 
   const loadPhotos = async () => {
@@ -193,6 +338,19 @@ function Photos() {
     setLoading(false);
   };
 
+  const loadAlbums = async () => {
+    try {
+      const data = await photoService.getAll();
+      const albumsSet = new Set();
+      data.forEach(photo => {
+        if (photo.album_id) albumsSet.add(photo.album_id);
+      });
+      setAlbums([...albumsSet]);
+    } catch (error) {
+      console.error('Erreur albums:', error);
+    }
+  };
+
   const formatDate = (dateString) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('fr-FR', {
@@ -201,6 +359,50 @@ function Photos() {
       year: 'numeric'
     });
   };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!formData.files || formData.files.length === 0) {
+      alert('Veuillez sélectionner au moins une photo');
+      return;
+    }
+
+    try {
+      const uploadData = new FormData();
+      for (let file of formData.files) {
+        uploadData.append('files', file);
+      }
+      uploadData.append('caption', formData.caption);
+      if (formData.album_id) uploadData.append('album_id', formData.album_id);
+
+      const response = await fetch('/api/photos', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('us_token')}`
+        },
+        body: uploadData
+      });
+
+      if (response.ok) {
+        setShowAddModal(false);
+        setFormData({ caption: '', album_id: '', files: null });
+        loadPhotos();
+        loadAlbums();
+      }
+    } catch (error) {
+      console.error('Erreur upload:', error);
+    }
+  };
+
+  const handleCreateAlbum = () => {
+    if (newAlbumName.trim()) {
+      setFormData({...formData, album_id: newAlbumName.trim()});
+      setShowAlbumModal(false);
+      setNewAlbumName('');
+    }
+  };
+
+  const filteredPhotos = currentAlbum === 'all' ? photos : photos.filter(p => p.album_id === currentAlbum);
 
   if (loading) {
     return (
@@ -216,14 +418,32 @@ function Photos() {
     <PhotosContainer className="fade-in">
       <Header>
         <Title>Photos</Title>
-        <AddButton>
+        <AddButton onClick={() => setShowAddModal(true)}>
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
 
+      <FilterTabs>
+        <FilterTab active={currentAlbum === 'all'} onClick={() => setCurrentAlbum('all')}>
+          Toutes
+        </FilterTab>
+        {albums.map(album => (
+          <FilterTab 
+            key={album} 
+            active={currentAlbum === album} 
+            onClick={() => setCurrentAlbum(album)}
+          >
+            📁 {album}
+          </FilterTab>
+        ))}
+        <CreateAlbumButton onClick={() => setShowAlbumModal(true)}>
+          + Album
+        </CreateAlbumButton>
+      </FilterTabs>
+
       <PhotoGrid>
-        {photos.length > 0 ? (
-          photos.map((photo) => (
+        {filteredPhotos.length > 0 ? (
+          filteredPhotos.map((photo) => (
             <PhotoCard key={photo._id} onClick={() => setSelectedPhoto(photo)}>
               <PhotoImage image={photo.url}>
                 <PhotoOverlay>
@@ -276,6 +496,67 @@ function Photos() {
           </>
         )}
       </Modal>
+
+      <AddModal show={showAddModal} onClick={() => setShowAddModal(false)}>
+        <ModalContent onClick={(e) => e.stopPropagation()}>
+          <ModalTitle>Ajouter des photos</ModalTitle>
+          <Form onSubmit={handleSubmit}>
+            <Input
+              type="text"
+              placeholder="Légende (optionnel)"
+              value={formData.caption}
+              onChange={(e) => setFormData({...formData, caption: e.target.value})}
+            />
+            
+            <Select
+              value={formData.album_id}
+              onChange={(e) => setFormData({...formData, album_id: e.target.value})}
+            >
+              <option value="">Aucun album</option>
+              {albums.map(album => (
+                <option key={album} value={album}>{album}</option>
+              ))}
+            </Select>
+            
+            <FileInput
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setFormData({...formData, files: e.target.files})}
+              required
+            />
+            
+            <FormButtons>
+              <SecondaryButton type="button" onClick={() => setShowAddModal(false)}>
+                Annuler
+              </SecondaryButton>
+              <PrimaryButton type="submit">
+                Ajouter
+              </PrimaryButton>
+            </FormButtons>
+          </Form>
+        </ModalContent>
+      </AddModal>
+
+      <AddModal show={showAlbumModal} onClick={() => setShowAlbumModal(false)}>
+        <ModalContent onClick={(e) => e.stopPropagation()}>
+          <ModalTitle>Créer un album</ModalTitle>
+          <Input
+            type="text"
+            placeholder="Nom de l'album"
+            value={newAlbumName}
+            onChange={(e) => setNewAlbumName(e.target.value)}
+          />
+          <FormButtons>
+            <SecondaryButton type="button" onClick={() => setShowAlbumModal(false)}>
+              Annuler
+            </SecondaryButton>
+            <PrimaryButton type="button" onClick={handleCreateAlbum}>
+              Créer
+            </PrimaryButton>
+          </FormButtons>
+        </ModalContent>
+      </AddModal>
     </PhotosContainer>
   );
 }

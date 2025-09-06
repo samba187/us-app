@@ -150,9 +150,168 @@ const LinkButton = styled.a`
   }
 `;
 
+const EditDeleteRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+`;
+
+const EditButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #4ecdc4;
+  border-radius: 6px;
+  background: white;
+  color: #4ecdc4;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #4ecdc4;
+    color: white;
+  }
+`;
+
+const DeleteButton = styled.button`
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid #ff6b8a;
+  border-radius: 6px;
+  background: white;
+  color: #ff6b8a;
+  font-size: 11px;
+  cursor: pointer;
+
+  &:hover {
+    background: #ff6b8a;
+    color: white;
+  }
+`;
+
+const Modal = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: ${props => props.show ? 'flex' : 'none'};
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+`;
+
+const ModalContent = styled.div`
+  background: white;
+  border-radius: 20px;
+  padding: 30px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
+`;
+
+const ModalTitle = styled.h2`
+  margin-bottom: 20px;
+  color: var(--text-color);
+`;
+
+const Form = styled.form`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const Input = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const TextArea = styled.textarea`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const Select = styled.select`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  background: white;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FileInput = styled.input`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
+const FormButtons = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+`;
+
+const Button = styled.button`
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+`;
+
+const PrimaryButton = styled(Button)`
+  background: linear-gradient(135deg, #ff6b8a, #4ecdc4);
+  color: white;
+`;
+
+const SecondaryButton = styled(Button)`
+  background: var(--border-color);
+  color: var(--text-color);
+`;
+
 function Wishlist() {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    link_url: '',
+    for_user: 'user1',
+    files: null
+  });
 
   useEffect(() => {
     loadWishlist();
@@ -174,6 +333,78 @@ function Wishlist() {
       loadWishlist();
     } catch (error) {
       console.error('Erreur lors de la mise à jour de l\'item:', error);
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      let imageUrls = [];
+      
+      if (formData.files && formData.files.length > 0) {
+        const uploadData = new FormData();
+        for (let file of formData.files) {
+          uploadData.append('files', file);
+        }
+        
+        const uploadResponse = await fetch('/api/upload', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('us_token')}`
+          },
+          body: uploadData
+        });
+        
+        if (uploadResponse.ok) {
+          const uploadResult = await uploadResponse.json();
+          imageUrls = uploadResult.files || [];
+        }
+      }
+
+      const itemData = {
+        title: formData.title,
+        description: formData.description,
+        link_url: formData.link_url,
+        for_user: formData.for_user,
+        images: imageUrls,
+        image_url: imageUrls[0] || ''
+      };
+
+      if (editingItem) {
+        await wishlistService.update(editingItem._id, itemData);
+      } else {
+        await wishlistService.create(itemData);
+      }
+      
+      setShowModal(false);
+      setEditingItem(null);
+      setFormData({ title: '', description: '', link_url: '', for_user: 'user1', files: null });
+      loadWishlist();
+    } catch (error) {
+      console.error('Erreur:', error);
+    }
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+    setFormData({
+      title: item.title,
+      description: item.description || '',
+      link_url: item.link_url || '',
+      for_user: item.for_user || 'user1',
+      files: null
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Supprimer cet élément ?')) {
+      try {
+        await wishlistService.delete(id);
+        loadWishlist();
+      } catch (error) {
+        console.error('Erreur suppression:', error);
+      }
     }
   };
 
@@ -205,7 +436,11 @@ function Wishlist() {
     <WishlistContainer className="fade-in">
       <Header>
         <Title>Wishlist</Title>
-        <AddButton>
+        <AddButton onClick={() => {
+          setEditingItem(null);
+          setFormData({ title: '', description: '', link_url: '', for_user: 'user1', files: null });
+          setShowModal(true);
+        }}>
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
@@ -255,6 +490,15 @@ function Wishlist() {
                 </LinkButton>
               )}
             </WishlistActions>
+            
+            <EditDeleteRow>
+              <EditButton onClick={() => handleEdit(item)}>
+                Modifier
+              </EditButton>
+              <DeleteButton onClick={() => handleDelete(item._id)}>
+                Supprimer
+              </DeleteButton>
+            </EditDeleteRow>
           </WishlistContent>
         </WishlistCard>
       ))}
@@ -268,6 +512,58 @@ function Wishlist() {
           </p>
         </div>
       )}
+
+      <Modal show={showModal} onClick={() => setShowModal(false)}>
+        <ModalContent onClick={(e) => e.stopPropagation()}>
+          <ModalTitle>{editingItem ? 'Modifier l\'élément' : 'Nouveau souhait'}</ModalTitle>
+          <Form onSubmit={handleSubmit}>
+            <Input
+              type="text"
+              placeholder="Titre"
+              value={formData.title}
+              onChange={(e) => setFormData({...formData, title: e.target.value})}
+              required
+            />
+            
+            <TextArea
+              placeholder="Description"
+              value={formData.description}
+              onChange={(e) => setFormData({...formData, description: e.target.value})}
+            />
+            
+            <Input
+              type="url"
+              placeholder="Lien (optionnel)"
+              value={formData.link_url}
+              onChange={(e) => setFormData({...formData, link_url: e.target.value})}
+            />
+            
+            <Select
+              value={formData.for_user}
+              onChange={(e) => setFormData({...formData, for_user: e.target.value})}
+            >
+              <option value="user1">Pour moi</option>
+              <option value="user2">Pour ma copine/mon copain</option>
+            </Select>
+            
+            <FileInput
+              type="file"
+              multiple
+              accept="image/*"
+              onChange={(e) => setFormData({...formData, files: e.target.files})}
+            />
+            
+            <FormButtons>
+              <SecondaryButton type="button" onClick={() => setShowModal(false)}>
+                Annuler
+              </SecondaryButton>
+              <PrimaryButton type="submit">
+                {editingItem ? 'Modifier' : 'Créer'}
+              </PrimaryButton>
+            </FormButtons>
+          </Form>
+        </ModalContent>
+      </Modal>
     </WishlistContainer>
   );
 }
