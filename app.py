@@ -82,7 +82,7 @@ def iso_to_dt(val):
         return dt.datetime.fromisoformat(s)
     except: return None
 
-def new_invite_code(n=8):
+def new_invite_code(n=6):  # 6 chars to align with frontend input constraint
     alphabet = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(n))
 
