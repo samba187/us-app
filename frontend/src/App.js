@@ -14,13 +14,14 @@ import Wishlist from './pages/Wishlist';
 import Photos from './pages/Photos';
 import Notes from './pages/Notes';
 import OnboardingCouple from './pages/OnboardingCouple';
+import Profile from './pages/Profile';
 
 // Services
 // import { authService } from './services/authService';
 
 const AppContainer = styled.div`
   min-height: 100vh;
-  background: ${props => props.isAuthenticated ? 'var(--background-color)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
+  background: ${props => props.$isAuthenticated ? 'var(--background-color)' : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'};
 `;
 
 const MainContent = styled.main`
@@ -87,14 +88,14 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <AppContainer isAuthenticated={isAuthenticated}>
+      <AppContainer $isAuthenticated={isAuthenticated}>
         <Login onLogin={handleLogin} />
       </AppContainer>
     );
   }
 
   return (
-    <AppContainer isAuthenticated={isAuthenticated}>
+    <AppContainer $isAuthenticated={isAuthenticated}>
       <Router>
         <MainContent>
           <Routes>
@@ -106,11 +107,12 @@ function App() {
             <Route path="/wishlist" element={<Wishlist />} />
             <Route path="/photos" element={<Photos />} />
             <Route path="/notes" element={<Notes />} />
+            <Route path="/profile" element={<Profile onLogout={handleLogout} />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </MainContent>
         {/* Ne pas afficher la navigation sur la page onboarding */}
-        {window.location.pathname !== '/onboarding-couple' && <Navigation onLogout={handleLogout} />}
+  {window.location.pathname !== '/onboarding-couple' && <Navigation />}
       </Router>
     </AppContainer>
   );
