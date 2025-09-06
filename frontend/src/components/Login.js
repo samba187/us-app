@@ -70,6 +70,7 @@ const Button = styled.button`
   transition: transform .25s, box-shadow .25s;
   &:hover { transform: translateY(-2px); box-shadow: 0 6px 18px rgba(0,0,0,0.18); }
   &:active { transform: translateY(0); }
+  &:disabled { opacity: .6; cursor: not-allowed; transform: none; }
 `;
 
 const ErrorMsg = styled.div`
@@ -81,34 +82,48 @@ const ErrorMsg = styled.div`
   text-align: center;
 `;
 
+const Toggle = styled.button`
+  margin-top: 22px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #ff6b8a;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 14px;
+`;
+
 export default function Login() {
+  const [mode, setMode] = useState('login'); // 'login' | 'register'
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handleLogin = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
     setError('');
     setLoading(true);
     try {
-      const { access_token, user } = await authService.login(email.trim(), password);
+      let authData;
+      if (mode === 'login') {
+        authData = await authService.login(email.trim(), password);
+      } else {
+        if (name.trim().length < 2) throw new Error('Nom trop court');
+        authData = await authService.register(name.trim(), email.trim(), password);
+      }
+      const { access_token, user } = authData;
       localStorage.setItem('us_token', access_token);
       localStorage.setItem('us_user', JSON.stringify(user));
-
       try {
         const cm = await coupleService.me();
-        if (!cm.in_couple) {
-          window.location.href = '/onboarding-couple';
-        } else {
-          window.location.href = '/';
-        }
-      } catch {
-        window.location.href = '/onboarding-couple';
-      }
-    } catch {
-      setError('Identifiants invalides');
+        if (!cm.in_couple) window.location.href = '/onboarding-couple';
+        else window.location.href = '/';
+      } catch { window.location.href = '/onboarding-couple'; }
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Erreur');
     }
     setLoading(false);
   };
@@ -117,25 +132,42 @@ export default function Login() {
     <Container>
       <Card>
         <Title>US</Title>
-        <Subtitle>Connexion à notre espace 💞</Subtitle>
+        <Subtitle>{mode === 'login' ? 'Connexion à notre espace 💞' : 'Créer ton compte 💖'}</Subtitle>
         {error && <ErrorMsg>{error}</ErrorMsg>}
-        <Form onSubmit={handleLogin}>
+        <Form onSubmit={handleSubmit}>
+          {mode === 'register' && (
+            <Input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Prénom"
+              required
+            />
+          )}
           <Input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={e=>setEmail(e.target.value)}
             placeholder="Email"
             required
           />
           <Input
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={e=>setPassword(e.target.value)}
             placeholder="Mot de passe"
             required
           />
-          <Button type="submit" disabled={loading}>{loading ? 'Connexion…' : 'Se connecter'}</Button>
+          <Button type="submit" disabled={loading}>
+            {loading ? (mode==='login'?'Connexion…':'Création…') : (mode==='login'?'Se connecter':'Créer le compte')}
+          </Button>
         </Form>
+        <Toggle
+          type="button"
+          onClick={()=>{ setMode(mode==='login'?'register':'login'); setError(''); }}
+        >
+          {mode==='login' ? "Pas de compte ? S'inscrire" : 'Déjà un compte ? Se connecter'}
+        </Toggle>
       </Card>
     </Container>
   );
