@@ -236,12 +236,45 @@ const SecondaryButton = styled(Button)`
   color: var(--text-color);
 `;
 
+const EditDeleteRow = styled.div`
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+`;
+
+const EditButton = styled.button`
+  flex: 1;
+  padding: 8px 12px;
+  background: #4ecdc4;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+`;
+
+const DeleteButton = styled.button`
+  flex: 1;
+  padding: 8px 12px;
+  background: #ff6b8a;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+`;
+
 function Reminders() {
   const [reminders, setReminders] = useState([]);
   const [filteredReminders, setFilteredReminders] = useState([]);
   const [filter, setFilter] = useState('all');
   const [showModal, setShowModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [editingReminder, setEditingReminder] = useState(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -290,12 +323,17 @@ function Reminders() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await reminderService.create(formData);
+      if (editingReminder) {
+        await reminderService.update(editingReminder._id, formData);
+      } else {
+        await reminderService.create(formData);
+      }
       setShowModal(false);
+      setEditingReminder(null);
       setFormData({ title: '', description: '', priority: 'normal', due_date: '' });
       loadReminders();
     } catch (error) {
-      console.error('Erreur lors de la création du rappel:', error);
+      console.error('Erreur lors de la sauvegarde du rappel:', error);
     }
   };
 
@@ -306,6 +344,28 @@ function Reminders() {
       loadReminders();
     } catch (error) {
       console.error('Erreur lors de la mise à jour du rappel:', error);
+    }
+  };
+
+  const handleEdit = (reminder) => {
+    setEditingReminder(reminder);
+    setFormData({
+      title: reminder.title,
+      description: reminder.description || '',
+      priority: reminder.priority,
+      due_date: reminder.due_date ? reminder.due_date.split('T')[0] : ''
+    });
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Supprimer ce rappel ?')) {
+      try {
+        await reminderService.delete(id);
+        loadReminders();
+      } catch (error) {
+        console.error('Erreur suppression:', error);
+      }
     }
   };
 
@@ -377,6 +437,15 @@ function Reminders() {
               <span>📅 {new Date(reminder.due_date).toLocaleDateString('fr-FR')}</span>
             )}
           </ReminderMeta>
+          
+          <EditDeleteRow>
+            <EditButton onClick={() => handleEdit(reminder)}>
+              Modifier
+            </EditButton>
+            <DeleteButton onClick={() => handleDelete(reminder._id)}>
+              Supprimer
+            </DeleteButton>
+          </EditDeleteRow>
         </ReminderCard>
       ))}
 

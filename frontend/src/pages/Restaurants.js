@@ -296,6 +296,9 @@ function Restaurants() {
     notes: '',
     files: null
   });
+  const [detailRestaurant, setDetailRestaurant] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailIndex, setDetailIndex] = useState(0);
 
   useEffect(() => {
     loadRestaurants();
@@ -333,7 +336,14 @@ function Restaurants() {
       if (formData.files && formData.files.length > 0) {
         const uploadData = new FormData();
         for (let file of formData.files) {
-          uploadData.append('files', file);
+          try {
+            // Lazy import local util via photoService for consistency
+            const { photoService } = await import('../services/authService');
+            const compressed = await photoService.compressImage(file, { maxWidth: 1400, quality: 0.7 });
+            uploadData.append('files', compressed);
+          } catch (e) {
+            uploadData.append('files', file);
+          }
         }
         
         const uploadResponse = await fetch('/api/upload', {
@@ -347,6 +357,7 @@ function Restaurants() {
         if (uploadResponse.ok) {
           const uploadResult = await uploadResponse.json();
           imageUrls = uploadResult.files || [];
+          console.debug('Upload restaurants result', uploadResult);
         }
       }
 
@@ -355,8 +366,8 @@ function Restaurants() {
         address: formData.address,
         map_url: formData.map_url,
         notes: formData.notes,
-        images: imageUrls,
-        image_url: imageUrls[0] || ''
+        images: imageUrls.length ? imageUrls : (editingRestaurant?.images || []),
+        image_url: (imageUrls[0]) || (editingRestaurant?.image_url || '')
       };
 
       if (editingRestaurant) {
@@ -463,7 +474,7 @@ function Restaurants() {
       </FilterTabs>
 
       {filteredRestaurants.map((restaurant) => (
-        <RestaurantCard key={restaurant._id}>
+        <RestaurantCard key={restaurant._id} onClick={() => { setDetailRestaurant(restaurant); setDetailIndex(0); setShowDetail(true); }}>
           <RestaurantImage image={restaurant.image_url}>
             <StatusBadge status={restaurant.status}>
               {getStatusIcon(restaurant.status)} {getStatusLabel(restaurant.status)}
@@ -504,7 +515,7 @@ function Restaurants() {
               </ActionButton>
             </RestaurantActions>
             
-            <EditDeleteRow>
+            <EditDeleteRow onClick={(e) => e.stopPropagation()}>
               <EditButton onClick={() => handleEdit(restaurant)}>
                 Modifier
               </EditButton>
@@ -571,6 +582,45 @@ function Restaurants() {
             </FormButtons>
           </Form>
         </ModalContent>
+      </Modal>
+
+      {/* Détail Restaurant */}
+      <Modal show={showDetail} onClick={() => setShowDetail(false)}>
+        {detailRestaurant && (
+          <ModalContent onClick={(e) => e.stopPropagation()}>
+            <ModalTitle>{detailRestaurant.name}</ModalTitle>
+            {detailRestaurant.images && detailRestaurant.images.length > 0 ? (
+              <div style={{marginBottom:'15px'}}>
+                <div style={{position:'relative', borderRadius:'12px', overflow:'hidden', boxShadow:'var(--shadow)'}}>
+                  <img src={detailRestaurant.images[detailIndex]} alt="resto" style={{width:'100%', display:'block'}} />
+                  {detailRestaurant.images.length > 1 && (
+                    <div style={{position:'absolute', top:8, right:8, display:'flex', gap:4}}>
+                      <button style={{background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', padding:'6px 10px', borderRadius:6, cursor:'pointer'}} onClick={() => setDetailIndex((detailIndex - 1 + detailRestaurant.images.length)%detailRestaurant.images.length)}>‹</button>
+                      <button style={{background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', padding:'6px 10px', borderRadius:6, cursor:'pointer'}} onClick={() => setDetailIndex((detailIndex + 1)%detailRestaurant.images.length)}>›</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{textAlign:'center', marginTop:8, fontSize:12, color:'var(--text-light)'}}>
+                  {detailIndex+1} / {detailRestaurant.images.length}
+                </div>
+                <div style={{display:'flex', gap:6, marginTop:10, overflowX:'auto'}}>
+                  {detailRestaurant.images.map((img,i)=>(
+                    <img key={i} src={img} alt={'mini'} onClick={()=>setDetailIndex(i)} style={{height:50, borderRadius:6, cursor:'pointer', outline: i===detailIndex?'2px solid #ff6b8a':'none'}} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{margin:'10px 0', fontSize:14, color:'var(--text-light)'}}>Aucune image</div>
+            )}
+            {detailRestaurant.address && <p style={{fontSize:14, margin:'4px 0'}}>📍 {detailRestaurant.address}</p>}
+            {detailRestaurant.map_url && <p style={{fontSize:14, margin:'4px 0'}}><a href={detailRestaurant.map_url} target="_blank" rel="noreferrer">Ouvrir la carte</a></p>}
+            {detailRestaurant.notes && <p style={{whiteSpace:'pre-line', fontSize:14, marginTop:10}}>{detailRestaurant.notes}</p>}
+            <FormButtons>
+              <SecondaryButton type="button" onClick={() => setShowDetail(false)}>Fermer</SecondaryButton>
+              <PrimaryButton type="button" onClick={() => { setShowDetail(false); handleEdit(detailRestaurant); }}>Éditer</PrimaryButton>
+            </FormButtons>
+          </ModalContent>
+        )}
       </Modal>
     </RestaurantsContainer>
   );

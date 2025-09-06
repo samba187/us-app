@@ -113,32 +113,32 @@ export default function PWAGuide() {
       <GuideContent>
         <Title>📱 Installer l'app</Title>
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
-          Pour une meilleure expérience, installez notre app sur votre écran d'accueil !
+          Pour une meilleure expérience, installe l'app sur ton écran d'accueil !
         </p>
         
         <Step>
           <StepNumber>1</StepNumber>
           <StepText>
-            Appuyez sur le bouton <Icon>📤</Icon> de partage en bas de Safari
+            Appuie sur le bouton <Icon>📤</Icon> de partage en bas de Safari
           </StepText>
         </Step>
         
         <Step>
           <StepNumber>2</StepNumber>
           <StepText>
-            Faites défiler et appuyez sur <Icon>➕</Icon> "Sur l'écran d'accueil"
+            Fais défiler et appuie sur <Icon>➕</Icon> "Sur l'écran d'accueil"
           </StepText>
         </Step>
         
         <Step>
           <StepNumber>3</StepNumber>
           <StepText>
-            Appuyez sur "Ajouter" en haut à droite
+            Appuie sur "Ajouter" en haut à droite
           </StepText>
         </Step>
         
         <p style={{ fontSize: '12px', color: '#888', marginTop: '15px' }}>
-          L'app apparaîtra sur votre écran d'accueil comme une vraie app ! 🎉
+          L'app apparaîtra sur ton écran d'accueil comme une vraie app ! 🎉
         </p>
         
         <CloseButton onClick={handleClose}>

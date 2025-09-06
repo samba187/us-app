@@ -88,6 +88,41 @@ export const wishlistService = {
 export const photoService = {
   getAll: async () => (await api.get('/photos')).data,
   create: async (photo) => (await api.post('/photos', photo)).data,
+  update: async (id, updates) => (await api.put(`/photos/${id}`, updates)).data,
+  delete: async (id) => (await api.delete(`/photos/${id}`)).data,
+  
+  // Upload avec fichier
+  uploadMultipart: async (formData) => {
+    // Endpoint /photos gère déjà la création des documents en base.
+    const token = localStorage.getItem('us_token');
+    const res = await axios.post(`${API_BASE_URL}/photos`, formData, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.data; // tableau de photos créées
+  },
+  compressImage: async (file, { maxWidth = 1600, quality = 0.75 } = {}) => {
+    if (!file.type.startsWith('image/')) return file;
+    const img = document.createElement('img');
+    const url = URL.createObjectURL(file);
+    try {
+      await new Promise((res, rej) => {
+        img.onload = res; img.onerror = rej; img.src = url;
+      });
+      const scale = Math.min(1, maxWidth / img.width);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const blob = await new Promise(r => canvas.toBlob(r, 'image/jpeg', quality));
+      if (!blob) return file;
+      return new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' });
+    } catch {
+      return file;
+    } finally {
+      URL.revokeObjectURL(url);
+    }
+  }
 };
 
 // ---- Notes
