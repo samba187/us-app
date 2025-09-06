@@ -85,12 +85,20 @@ export default function OnboardingCouple(){
         <Title>Créer & partager</Title>
         <Sub>Génère un code si tu es le premier. Envoie-le ou partage directement le lien.</Sub>
         {inviteCode ? <CodeBox>{inviteCode}</CodeBox> : <CodeBox style={{opacity:.4,fontSize:24,letterSpacing:2}}>AUCUN CODE</CodeBox>}
+        {existing && !message && (
+          <Small style={{marginTop:4,color:'#036245'}}>Un code existe déjà – partage-le ou régénère.</Small>
+        )}
         <ButtonsRow>
           <Btn type="button" onClick={()=>createOrRefresh(false)} disabled={loadingCreate}>{loadingCreate? '...':'Générer'}</Btn>
           <Btn type="button" onClick={()=>createOrRefresh(true)} variant="secondary" disabled={loadingCreate || !inviteCode}>Refresh</Btn>
           <Btn type="button" onClick={copy} variant="secondary" disabled={!inviteCode}>Copier</Btn>
           <Btn type="button" onClick={share} variant="secondary" disabled={!inviteCode}>Partager</Btn>
         </ButtonsRow>
+        {existing && (
+          <ButtonsRow style={{marginTop:10}}>
+            <Btn type="button" variant="secondary" onClick={()=>window.location.reload()}>Vérifier si reliés</Btn>
+          </ButtonsRow>
+        )}
         <Small>Le code reste valide tant que vous n’êtes pas encore liés.</Small>
       </Panel>
 
