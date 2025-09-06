@@ -1,9 +1,10 @@
 # app.py
 import os, re, secrets, string, datetime as dt
+from uuid import uuid4
 from functools import wraps
 
 from dotenv import load_dotenv
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, send_from_directory
 from flask_cors import CORS
 from pymongo import MongoClient
 from bson.objectid import ObjectId
@@ -85,6 +86,17 @@ def iso_to_dt(val):
 def new_invite_code(n=6):  # 6 chars to align with frontend input constraint
     alphabet = string.ascii_uppercase + string.digits
     return ''.join(secrets.choice(alphabet) for _ in range(n))
+
+UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+def save_file(f):
+    """Save a Werkzeug FileStorage and return public URL path."""
+    ext = os.path.splitext(f.filename or '')[1][:8]
+    name = f"{uuid4().hex}{ext}"
+    path = os.path.join(UPLOAD_DIR, name)
+    f.save(path)
+    return f"/uploads/{name}"
 
 def ensure_indexes():
     try:
@@ -293,6 +305,7 @@ def restaurants_create(u, cid):
         "address": data.get("address",""),
         "map_url": data.get("map_url",""),
         "image_url": data.get("image_url",""),
+    "images": data.get("images", []),
         "status": data.get("status","to_try"),
         "notes": data.get("notes",""),
         "added_by": str(u["_id"]),
@@ -336,6 +349,7 @@ def activities_create(u, cid):
         "category": data.get("category","other"),
         "status": data.get("status","planned"),
         "notes": data.get("notes",""),
+    "images": data.get("images", []),
         "image_url": data.get("image_url",""),
         "added_by": str(u["_id"]),
         "added_at": dt.datetime.utcnow(),
@@ -377,6 +391,7 @@ def wishlist_create(u, cid):
         "title": data["title"],
         "description": data.get("description",""),
         "image_url": data.get("image_url",""),
+    "images": data.get("images", []),
         "link_url": data.get("link_url",""),
         "for_user": data.get("for_user"),
         "added_by": str(u["_id"]),
@@ -415,7 +430,29 @@ def photos_list(u, cid):
 @jwt_required()
 @require_couple
 def photos_create(u, cid):
+    # Accept JSON (single) OR multipart (multi-files)
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        files = request.files.getlist('files')
+        caption = request.form.get('caption','')
+        created = []
+        for f in files:
+            try:
+                url = save_file(f)
+                item = {
+                    "url": url,
+                    "caption": caption,
+                    "album_id": None,
+                    "uploaded_by": str(u["_id"]),
+                    "uploaded_at": dt.datetime.utcnow(),
+                    "couple_id": cid
+                }
+                res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
+                created.append(serialize(item))
+            except Exception as e:
+                print('upload error', e)
+        return jsonify(created), 201
     data = request.get_json() or {}
+    if not data.get('url'): return {"error":"missing_url"}, 400
     item = {
         "url": data["url"],
         "caption": data.get("caption",""),
@@ -465,6 +502,26 @@ def notes_update(u, cid, nid):
 def notes_delete(u, cid, nid):
     notes_col.delete_one({"_id": oid(nid), "couple_id": cid})
     return {"msg":"deleted"}
+
+# ───────── Upload (generic) ─────────
+@app.post('/api/upload')
+@jwt_required()
+@require_couple
+def upload_files(u, cid):
+    if 'files' not in request.files:
+        return {'error':'no_files'}, 400
+    urls = []
+    for f in request.files.getlist('files'):
+        try:
+            url = save_file(f)
+            urls.append(url)
+        except Exception as e:
+            print('upload err', e)
+    return {'files': urls}
+
+@app.get('/uploads/<path:fname>')
+def serve_upload(fname):
+    return send_from_directory(UPLOAD_DIR, fname)
 
 # ───────── Entrypoint ─────────
 if __name__ == "__main__":

@@ -9,8 +9,8 @@ import {
   FiHeart, 
   FiCamera, 
   FiFileText,
-  FiLogOut,
-  FiPlus
+  FiPlus,
+  FiUser
 } from 'react-icons/fi';
 
 const NavContainer = styled.nav`
@@ -74,19 +74,7 @@ const AddButton = styled.button`
   }
 `;
 
-const LogoutButton = styled.button`
-  position: absolute;
-  top: 20px;
-  right: 20px;
-  background: rgba(255, 255, 255, 0.9);
-  border: none;
-  padding: 10px;
-  border-radius: 50%;
-  color: var(--text-color);
-  cursor: pointer;
-  box-shadow: var(--shadow);
-  z-index: 1001;
-`;
+// Logout removed; moved to Profile page
 
 const AddModal = styled.div`
   position: fixed;
@@ -133,7 +121,7 @@ const AddMenuIcon = styled.div`
   color: var(--primary-color);
 `;
 
-function Navigation({ onLogout }) {
+function Navigation() {
   const location = useLocation();
   const [showAddMenu, setShowAddMenu] = useState(false);
 
@@ -148,6 +136,7 @@ function Navigation({ onLogout }) {
     { path: '/wishlist', icon: FiHeart, label: 'Wishlist' },
     { path: '/photos', icon: FiCamera, label: 'Photos' },
     { path: '/notes', icon: FiFileText, label: 'Notes' },
+    { path: '/profile', icon: FiUser, label: 'Profil' },
   ];
 
   const addMenuItems = [
@@ -161,10 +150,6 @@ function Navigation({ onLogout }) {
 
   return (
     <>
-      <LogoutButton onClick={onLogout} title="Déconnexion">
-        <FiLogOut />
-      </LogoutButton>
-
       <NavContainer>
         <NavGrid>
           {navItems.map((item) => (
