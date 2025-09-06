@@ -258,6 +258,74 @@ const SecondaryButton = styled(Button)`
   color: var(--text-color);
 `;
 
+const AlbumTabs = styled.div`
+  display: flex;
+  background: white;
+  border-radius: 12px;
+  padding: 4px;
+  margin-bottom: 20px;
+  box-shadow: var(--shadow);
+  overflow-x: auto;
+`;
+
+const AlbumTab = styled.button`
+  padding: 8px 12px;
+  border: none;
+  border-radius: 8px;
+  background: ${props => props.active ? 'var(--primary-color)' : 'transparent'};
+  color: ${props => props.active ? 'white' : 'var(--text-color)'};
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 12px;
+  white-space: nowrap;
+`;
+
+const PhotoEditActions = styled.div`
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 8px;
+  display: flex;
+  gap: 8px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+
+  ${PhotoCard}:hover & {
+    opacity: 1;
+  }
+`;
+
+const PhotoActionBtn = styled.button`
+  background: rgba(255,255,255,0.2);
+  border: 1px solid rgba(255,255,255,0.3);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  cursor: pointer;
+
+  &:hover {
+    background: rgba(255,255,255,0.3);
+  }
+`;
+
+const FormSelect = styled.select`
+  padding: 12px;
+  border: 2px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 16px;
+  background: white;
+
+  &:focus {
+    outline: none;
+    border-color: var(--primary-color);
+  }
+`;
+
 const FilterTabs = styled.div`
   display: flex;
   background: white;
@@ -369,26 +437,19 @@ function Photos() {
 
     try {
       const uploadData = new FormData();
+      // Compression séquentielle (peut être parallélisée si besoin)
       for (let file of formData.files) {
-        uploadData.append('files', file);
+        const compressed = await photoService.compressImage(file, { maxWidth: 1600, quality: 0.72 });
+        uploadData.append('files', compressed);
       }
       uploadData.append('caption', formData.caption);
       if (formData.album_id) uploadData.append('album_id', formData.album_id);
 
-      const response = await fetch('/api/photos', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('us_token')}`
-        },
-        body: uploadData
-      });
-
-      if (response.ok) {
-        setShowAddModal(false);
-        setFormData({ caption: '', album_id: '', files: null });
-        loadPhotos();
-        loadAlbums();
-      }
+  await photoService.uploadMultipart(uploadData);
+  setShowAddModal(false);
+  setFormData({ caption: '', album_id: '', files: null });
+  loadPhotos();
+  loadAlbums();
     } catch (error) {
       console.error('Erreur upload:', error);
     }
@@ -399,6 +460,17 @@ function Photos() {
       setFormData({...formData, album_id: newAlbumName.trim()});
       setShowAlbumModal(false);
       setNewAlbumName('');
+    }
+  };
+
+  const handleDeletePhoto = async (id) => {
+    if (window.confirm('Supprimer cette photo ?')) {
+      try {
+        await photoService.delete(id);
+        loadPhotos();
+      } catch (error) {
+        console.error('Erreur suppression:', error);
+      }
     }
   };
 

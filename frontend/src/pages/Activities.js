@@ -339,6 +339,9 @@ function Activities() {
     notes: '',
     files: null
   });
+  const [detailActivity, setDetailActivity] = useState(null);
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailIndex, setDetailIndex] = useState(0);
 
   useEffect(() => {
     loadActivities();
@@ -382,7 +385,7 @@ function Activities() {
     try {
       let imageUrls = [];
       
-      if (formData.files && formData.files.length > 0) {
+  if (formData.files && formData.files.length > 0) {
         const uploadData = new FormData();
         for (let file of formData.files) {
           uploadData.append('files', file);
@@ -406,8 +409,8 @@ function Activities() {
         title: formData.title,
         category: formData.category,
         notes: formData.notes,
-        images: imageUrls,
-        image_url: imageUrls[0] || ''
+        images: imageUrls.length ? imageUrls : (editingActivity?.images || []),
+        image_url: (imageUrls[0]) || (editingActivity?.image_url || '')
       };
 
       if (editingActivity) {
@@ -495,7 +498,7 @@ function Activities() {
       </FilterTabs>
 
       {filteredActivities.map((activity) => (
-        <ActivityCard key={activity._id}>
+        <ActivityCard key={activity._id} onClick={() => { setDetailActivity(activity); setDetailIndex(0); setShowDetail(true); }}>
           <ActivityImage image={activity.image_url} category={activity.category}>
             {!activity.image_url && (
               <CategoryIcon>{getCategoryIcon(activity.category)}</CategoryIcon>
@@ -534,7 +537,7 @@ function Activities() {
               </ActionButton>
             </ActivityActions>
             
-            <EditDeleteRow>
+            <EditDeleteRow onClick={(e)=> e.stopPropagation()}>
               <EditButton onClick={() => handleEdit(activity)}>
                 Modifier
               </EditButton>
@@ -599,6 +602,44 @@ function Activities() {
             </FormButtons>
           </Form>
         </ModalContent>
+      </Modal>
+
+      {/* Détail Activité */}
+      <Modal show={showDetail} onClick={() => setShowDetail(false)}>
+        {detailActivity && (
+          <ModalContent onClick={(e)=> e.stopPropagation()}>
+            <ModalTitle>{detailActivity.title}</ModalTitle>
+            {detailActivity.images && detailActivity.images.length > 0 ? (
+              <div style={{marginBottom:'15px'}}>
+                <div style={{position:'relative', borderRadius:'12px', overflow:'hidden', boxShadow:'var(--shadow)'}}>
+                  <img src={detailActivity.images[detailIndex]} alt='activity' style={{width:'100%', display:'block'}} />
+                  {detailActivity.images.length > 1 && (
+                    <div style={{position:'absolute', top:8, right:8, display:'flex', gap:4}}>
+                      <button style={{background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', padding:'6px 10px', borderRadius:6, cursor:'pointer'}} onClick={() => setDetailIndex((detailIndex - 1 + detailActivity.images.length)%detailActivity.images.length)}>‹</button>
+                      <button style={{background:'rgba(0,0,0,0.5)', color:'#fff', border:'none', padding:'6px 10px', borderRadius:6, cursor:'pointer'}} onClick={() => setDetailIndex((detailIndex + 1)%detailActivity.images.length)}>›</button>
+                    </div>
+                  )}
+                </div>
+                <div style={{textAlign:'center', marginTop:8, fontSize:12, color:'var(--text-light)'}}>
+                  {detailIndex+1} / {detailActivity.images.length}
+                </div>
+                <div style={{display:'flex', gap:6, marginTop:10, overflowX:'auto'}}>
+                  {detailActivity.images.map((img,i)=>(
+                    <img key={i} src={img} alt='mini' onClick={()=>setDetailIndex(i)} style={{height:50, borderRadius:6, cursor:'pointer', outline: i===detailIndex?'2px solid #ff6b8a':'none'}} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{margin:'10px 0', fontSize:14, color:'var(--text-light)'}}>Aucune image</div>
+            )}
+            <p style={{fontSize:14, margin:'4px 0'}}>Catégorie: {detailActivity.category}</p>
+            {detailActivity.notes && <p style={{whiteSpace:'pre-line', fontSize:14, marginTop:10}}>{detailActivity.notes}</p>}
+            <FormButtons>
+              <SecondaryButton type='button' onClick={()=> setShowDetail(false)}>Fermer</SecondaryButton>
+              <PrimaryButton type='button' onClick={()=> { setShowDetail(false); handleEdit(detailActivity); }}>Éditer</PrimaryButton>
+            </FormButtons>
+          </ModalContent>
+        )}
       </Modal>
     </ActivitiesContainer>
   );

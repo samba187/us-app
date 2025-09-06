@@ -295,6 +295,15 @@ def restaurants_list(u, cid):
     items = list(restaurants_col.find({"couple_id": cid}).sort("added_at",-1))
     return jsonify([serialize(x) for x in items])
 
+@app.get('/api/restaurants/<rid>')
+@jwt_required()
+@require_couple
+def restaurants_get(u, cid, rid):
+    doc = restaurants_col.find_one({"_id": oid(rid), "couple_id": cid})
+    if not doc:
+        return {"error":"not_found"}, 404
+    return jsonify(serialize(doc))
+
 @app.post("/api/restaurants")
 @jwt_required()
 @require_couple
@@ -320,7 +329,7 @@ def restaurants_create(u, cid):
 @require_couple
 def restaurants_update(u, cid, rid):
     data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["name","address","map_url","image_url","status","notes"]}
+    fields = {k: v for k,v in data.items() if k in ["name","address","map_url","image_url","status","notes","images"]}
     restaurants_col.update_one({"_id": oid(rid), "couple_id": cid}, {"$set": fields})
     return {"msg":"updated"}
 
@@ -338,6 +347,15 @@ def restaurants_delete(u, cid, rid):
 def activities_list(u, cid):
     items = list(activities_col.find({"couple_id": cid}).sort("added_at",-1))
     return jsonify([serialize(x) for x in items])
+
+@app.get('/api/activities/<aid>')
+@jwt_required()
+@require_couple
+def activities_get(u, cid, aid):
+    doc = activities_col.find_one({"_id": oid(aid), "couple_id": cid})
+    if not doc:
+        return {"error":"not_found"}, 404
+    return jsonify(serialize(doc))
 
 @app.post("/api/activities")
 @jwt_required()
@@ -363,7 +381,7 @@ def activities_create(u, cid):
 @require_couple
 def activities_update(u, cid, aid):
     data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["title","category","status","notes","image_url"]}
+    fields = {k: v for k,v in data.items() if k in ["title","category","status","notes","image_url","images"]}
     activities_col.update_one({"_id": oid(aid), "couple_id": cid}, {"$set": fields})
     return {"msg":"updated"}
 
@@ -434,6 +452,7 @@ def photos_create(u, cid):
     if request.content_type and 'multipart/form-data' in request.content_type:
         files = request.files.getlist('files')
         caption = request.form.get('caption','')
+        album_id = request.form.get('album_id') or None
         created = []
         for f in files:
             try:
@@ -441,7 +460,7 @@ def photos_create(u, cid):
                 item = {
                     "url": url,
                     "caption": caption,
-                    "album_id": None,
+                    "album_id": album_id,
                     "uploaded_by": str(u["_id"]),
                     "uploaded_at": dt.datetime.utcnow(),
                     "couple_id": cid
@@ -463,6 +482,36 @@ def photos_create(u, cid):
     }
     res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
     return jsonify(serialize(item)), 201
+
+@app.put("/api/photos/<pid>")
+@jwt_required()
+@require_couple
+def photos_update(u, cid, pid):
+    data = request.get_json() or {}
+    fields = {k: v for k,v in data.items() if k in ["caption","album_id"]}
+    photos_col.update_one({"_id": oid(pid), "couple_id": cid}, {"$set": fields})
+    return {"msg":"updated"}
+
+@app.delete("/api/photos/<pid>")
+@jwt_required()
+@require_couple
+def photos_delete(u, cid, pid):
+    doc = photos_col.find_one({"_id": oid(pid), "couple_id": cid})
+    if not doc:
+        return {"error": "not_found"}, 404
+    # Remove DB record first
+    photos_col.delete_one({"_id": oid(pid), "couple_id": cid})
+    # Try delete physical file
+    try:
+        url = doc.get('url') or ''  # stored as /uploads/<name>
+        if url.startswith('/uploads/'):
+            fname = url.split('/uploads/',1)[1]
+            fpath = os.path.join(UPLOAD_DIR, fname)
+            if os.path.isfile(fpath):
+                os.remove(fpath)
+    except Exception as e:
+        print('file delete err', e)
+    return {"msg":"deleted"}
 
 # ───────── Notes ─────────
 @app.get("/api/notes")
@@ -503,13 +552,16 @@ def notes_delete(u, cid, nid):
     notes_col.delete_one({"_id": oid(nid), "couple_id": cid})
     return {"msg":"deleted"}
 
-# ───────── Upload (generic) ─────────
+# ───────── Upload (generic - no DB side effects) ─────────
 @app.post('/api/upload')
 @jwt_required()
 @require_couple
 def upload_files(u, cid):
+    """Generic file upload used by other feature forms (e.g., restaurants).
+    Returns just the stored file URLs under key 'files'.
+    (Photo library should use /api/photos for DB records.)"""
     if 'files' not in request.files:
-        return {'error':'no_files'}, 400
+        return {'error': 'no_files'}, 400
     urls = []
     for f in request.files.getlist('files'):
         try:

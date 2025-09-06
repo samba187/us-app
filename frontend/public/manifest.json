@@ -6,22 +6,6 @@
       "src": "favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
-    },
-    {
-      "src": "apple-touch-icon.png",
-      "type": "image/png",
-      "sizes": "180x180",
-      "purpose": "any maskable"
-    },
-    {
-      "src": "favicon-32x32.png",
-      "type": "image/png",
-      "sizes": "32x32"
-    },
-    {
-      "src": "favicon-16x16.png",
-      "type": "image/png",
-      "sizes": "16x16"
     }
   ],
   "start_url": ".",
@@ -29,6 +13,5 @@
   "theme_color": "#ff6b8a",
   "background_color": "#ffffff",
   "orientation": "portrait-primary",
-  "scope": "/",
-  "categories": ["lifestyle", "social"]
+  "scope": "/"
 }

@@ -132,7 +132,7 @@ export default function Login() {
     <Container>
       <Card>
         <Title>US</Title>
-        <Subtitle>{mode === 'login' ? 'Connexion à notre espace 💞' : 'Créer ton compte 💖'}</Subtitle>
+        <Subtitle>{mode === 'login' ? 'Connexion à notre espace ' : 'Créer ton compte '}</Subtitle>
         {error && <ErrorMsg>{error}</ErrorMsg>}
         <Form onSubmit={handleSubmit}>
           {mode === 'register' && (
