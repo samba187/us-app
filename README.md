@@ -207,4 +207,3 @@ Pour toute question ou amélioration, n'hésitez pas ! ❤️
 
 ---
 
-*Fait avec amour pour notre petit couple* 💕✨

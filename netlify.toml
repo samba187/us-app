@@ -1,11 +1,13 @@
 [build]
-  publish = "frontend/build"
-  command = "cd frontend && npm ci && npm run build:netlify"
+  base = "frontend"
+  publish = "build"
+  command = "npm ci && npm run build"
 
 [build.environment]
   ESLINT_NO_DEV_ERRORS = "true"
   GENERATE_SOURCEMAP = "false"
   CI = "false"
+  NODE_VERSION = "18"
 
 [[redirects]]
   from = "/*"
