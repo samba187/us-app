@@ -1,0 +1,16 @@
+[build]
+  publish = "frontend/build"
+  command = "cd frontend && npm ci && npm run build:netlify"
+
+[build.environment]
+  ESLINT_NO_DEV_ERRORS = "true"
+  GENERATE_SOURCEMAP = "false"
+  CI = "false"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+[context.production.environment]
+  REACT_APP_PWA_ENABLED = "true"

@@ -188,7 +188,7 @@ export default function NotificationSettings() {
           <SettingItem>
             <div>
               <SettingLabel>Nouveaux rappels</SettingLabel>
-              <SettingDescription>Notifier lors de l'ajout d'un rappel</SettingDescription>
+              <SettingDescription>Notifier lors de l&apos;ajout d&apos;un rappel</SettingDescription>
             </div>
             <Toggle 
               active={settings.newReminders}
@@ -210,7 +210,7 @@ export default function NotificationSettings() {
           <SettingItem>
             <div>
               <SettingLabel>Échéances</SettingLabel>
-              <SettingDescription>Notifier avant les dates d'échéance</SettingDescription>
+              <SettingDescription>Notifier avant les dates d&apos;échéance</SettingDescription>
             </div>
             <Toggle 
               active={settings.dueDateReminders}

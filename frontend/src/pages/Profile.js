@@ -21,7 +21,7 @@ export default function Profile({onLogout}){
       <Row><strong>Vous</strong><span>{JSON.parse(localStorage.getItem('us_user')||'{}')?.name}</span></Row>
       {partner && <Row><strong>Partenaire</strong><span>{partner.name}</span></Row>}
       {!partner && inviteCode && <div style={{marginTop:16}}>
-        <div style={{fontSize:14,marginBottom:6}}>Code d'invitation à partager :</div>
+        <div style={{fontSize:14,marginBottom:6}}>Code d&apos;invitation à partager :</div>
         <CodeBox>{inviteCode}</CodeBox>
       </div>}
       <div style={{marginTop:28}}>
