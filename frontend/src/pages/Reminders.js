@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiPlus, FiCheck, FiClock, FiAlertCircle } from 'react-icons/fi';
 import { reminderService } from '../services/authService';
+import notificationService from '../services/notificationService';
+import NotificationSettings from '../components/NotificationSettings';
 
 const RemindersContainer = styled.div`
   padding: 20px;
@@ -284,7 +286,17 @@ function Reminders() {
 
   useEffect(() => {
     loadReminders();
+    // Initialiser les notifications
+    initNotifications();
   }, []);
+
+  const initNotifications = async () => {
+    try {
+      await notificationService.init();
+    } catch (error) {
+      console.error('Erreur initialisation notifications:', error);
+    }
+  };
 
   useEffect(() => {
     const filterReminders = () => {
@@ -308,6 +320,12 @@ function Reminders() {
     };
 
     filterReminders();
+    
+    // Programmer les notifications pour les échéances
+    const notificationSettings = JSON.parse(localStorage.getItem('notification_settings') || '{}');
+    if (notificationSettings.dueDateReminders !== false) {
+      notificationService.scheduleReminderNotifications(reminders);
+    }
   }, [reminders, filter]);
 
   const loadReminders = async () => {
@@ -323,11 +341,28 @@ function Reminders() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      let reminder;
       if (editingReminder) {
         await reminderService.update(editingReminder._id, formData);
+        reminder = { ...editingReminder, ...formData };
       } else {
-        await reminderService.create(formData);
+        const result = await reminderService.create(formData);
+        reminder = result;
+        
+        // Notification pour nouveau rappel
+        const notificationSettings = JSON.parse(localStorage.getItem('notification_settings') || '{}');
+        if (notificationSettings.newReminders !== false) {
+          await notificationService.notifyNewReminder(reminder);
+          
+          // Notification spéciale pour rappels urgents
+          if (reminder.priority === 'urgent' && notificationSettings.urgentReminders !== false) {
+            setTimeout(() => {
+              notificationService.notifyUrgentReminder(reminder);
+            }, 1000);
+          }
+        }
       }
+      
       setShowModal(false);
       setEditingReminder(null);
       setFormData({ title: '', description: '', priority: 'normal', due_date: '' });
@@ -395,6 +430,8 @@ function Reminders() {
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
+
+      <NotificationSettings />
 
       <FilterTabs>
         <FilterTab active={filter === 'all'} onClick={() => setFilter('all')}>

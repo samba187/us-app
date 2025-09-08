@@ -7,6 +7,7 @@ import './App.css';
 import Login from './components/Login';
 import Navigation from './components/Navigation';
 import PWAGuide from './components/PWAGuide';
+import NotificationTester from './components/NotificationTester';
 import Home from './pages/Home';
 import Reminders from './pages/Reminders';
 import Restaurants from './pages/Restaurants';
@@ -115,6 +116,7 @@ function App() {
         {/* Ne pas afficher la navigation sur la page onboarding */}
         {window.location.pathname !== '/onboarding-couple' && <Navigation />}
         <PWAGuide />
+        <NotificationTester />
       </Router>
     </AppContainer>
   );
