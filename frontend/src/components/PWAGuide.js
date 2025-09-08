@@ -116,9 +116,9 @@ export default function PWAGuide() {
   return (
     <PWAGuideContainer show={showGuide}>
       <GuideContent>
-        <Title>📱 Installer l'app</Title>
+        <Title>📱 Installer l&apos;app</Title>
         <p style={{ fontSize: '14px', color: '#666', marginBottom: '20px' }}>
-          Pour une meilleure expérience, installe l'app sur ton écran d'accueil !
+          Pour une meilleure expérience, installe l&apos;app sur ton écran d&apos;accueil !
         </p>
         
         <Step>
@@ -131,23 +131,23 @@ export default function PWAGuide() {
         <Step>
           <StepNumber>2</StepNumber>
           <StepText>
-            Fais défiler et appuie sur <Icon>➕</Icon> "Sur l'écran d'accueil"
+            Fais défiler et appuie sur <Icon>➕</Icon> &quot;Sur l&apos;écran d&apos;accueil&quot;
           </StepText>
         </Step>
         
         <Step>
           <StepNumber>3</StepNumber>
           <StepText>
-            Appuie sur "Ajouter" en haut à droite
+            Appuie sur &quot;Ajouter&quot; en haut à droite
           </StepText>
         </Step>
         
         <p style={{ fontSize: '12px', color: '#888', marginTop: '15px' }}>
-          L'app apparaîtra sur ton écran d'accueil comme une vraie app ! 🎉
+          L&apos;app apparaîtra sur ton écran d&apos;accueil comme une vraie app ! 🎉
         </p>
         
         <CloseButton onClick={handleClose}>
-          J'ai compris !
+          J&apos;ai compris !
         </CloseButton>
         
         <div>

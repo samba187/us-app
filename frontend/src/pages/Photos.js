@@ -258,6 +258,7 @@ const SecondaryButton = styled(Button)`
   color: var(--text-color);
 `;
 
+// eslint-disable-next-line no-unused-vars
 const AlbumTabs = styled.div`
   display: flex;
   background: white;
@@ -268,6 +269,7 @@ const AlbumTabs = styled.div`
   overflow-x: auto;
 `;
 
+// eslint-disable-next-line no-unused-vars
 const AlbumTab = styled.button`
   padding: 8px 12px;
   border: none;
@@ -281,6 +283,7 @@ const AlbumTab = styled.button`
   white-space: nowrap;
 `;
 
+// eslint-disable-next-line no-unused-vars
 const PhotoEditActions = styled.div`
   position: absolute;
   bottom: 0;
@@ -299,6 +302,7 @@ const PhotoEditActions = styled.div`
   }
 `;
 
+// eslint-disable-next-line no-unused-vars
 const PhotoActionBtn = styled.button`
   background: rgba(255,255,255,0.2);
   border: 1px solid rgba(255,255,255,0.3);
@@ -313,6 +317,7 @@ const PhotoActionBtn = styled.button`
   }
 `;
 
+// eslint-disable-next-line no-unused-vars
 const FormSelect = styled.select`
   padding: 12px;
   border: 2px solid var(--border-color);
@@ -463,6 +468,7 @@ function Photos() {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const handleDeletePhoto = async (id) => {
     if (window.confirm('Supprimer cette photo ?')) {
       try {
