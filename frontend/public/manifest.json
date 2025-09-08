@@ -13,5 +13,14 @@
   "theme_color": "#ff6b8a",
   "background_color": "#ffffff",
   "orientation": "portrait-primary",
-  "scope": "/"
+  "scope": "/",
+  "gcm_sender_id": "103953800507",
+  "permissions": [
+    "notifications"
+  ],
+  "notification": {
+    "icon": "/favicon.ico",
+    "vibrate": [200, 100, 200],
+    "badge": "/favicon.ico"
+  }
 }

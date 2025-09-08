@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
+import notificationService from '../services/notificationService';
 
 const PWAGuideContainer = styled.div`
   position: fixed;
@@ -99,6 +100,10 @@ export default function PWAGuide() {
   const handleClose = () => {
     setShowGuide(false);
     localStorage.setItem('pwa_guide_seen', 'true');
+    // Initialiser les notifications après installation PWA
+    setTimeout(() => {
+      notificationService.init();
+    }, 1000);
   };
 
   const handleDismiss = () => {
