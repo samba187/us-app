@@ -80,9 +80,11 @@ self.addEventListener('fetch', (event) => {
 self.addEventListener('push', event => {
   let data = {};
   try { if (event.data) data = JSON.parse(event.data.text()); } catch(e) { data = { title: 'Notification', body: event.data && event.data.text() }; }
-  const title = data.title || 'US';
+  let title = data.title || 'US';
+  if (data.type === 'reminder_created' && !data.title) title = 'Nouveau rappel';
+  if (data.type === 'wishlist_created') title = 'Nouvel item wishlist';
   const options = {
-    body: data.body || 'Nouvelle activité',
+    body: data.body || (data.type === 'wishlist_created' ? 'Nouvel item ajouté' : 'Nouvelle activité'),
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     data,
