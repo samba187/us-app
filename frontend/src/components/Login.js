@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { authService, coupleService } from '../services/authService';
 
@@ -93,19 +93,39 @@ const Toggle = styled.button`
   font-size: 14px;
 `;
 
-export default function Login() {
+export default function Login({ onLogin }) {
   const [mode, setMode] = useState('login'); // 'login' | 'register'
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [apiStatus, setApiStatus] = useState('checking'); // 'checking' | 'online' | 'offline'
+
+  // Vérifier le statut de l'API au chargement
+  useEffect(() => {
+    const checkApiStatus = async () => {
+      try {
+        // Test avec un endpoint qui existe (par exemple /api/test ou juste une requête OPTIONS)
+        const response = await fetch((process.env.REACT_APP_API_URL || 'http://localhost:5000') + '/api/login', {
+          method: 'OPTIONS'
+        });
+        setApiStatus(response.ok ? 'online' : 'offline');
+      } catch (error) {
+        // eslint-disable-next-line no-console
+        console.error('API Status check failed:', error);
+        setApiStatus('offline');
+      }
+    };
+    checkApiStatus();
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
     setError('');
     setLoading(true);
+    
     try {
       let authData;
       if (mode === 'login') {
@@ -114,15 +134,38 @@ export default function Login() {
         if (name.trim().length < 2) throw new Error('Nom trop court');
         authData = await authService.register(name.trim(), email.trim(), password);
       }
+      
       const { access_token, user } = authData;
+      
+      // Stocker temporairement le token pour les appels suivants
       localStorage.setItem('us_token', access_token);
       localStorage.setItem('us_user', JSON.stringify(user));
+      
+      // Vérifier si l'utilisateur est dans un couple
       try {
-        const cm = await coupleService.me();
-        if (!cm.in_couple) window.location.href = '/onboarding-couple';
-        else window.location.href = '/';
-      } catch { window.location.href = '/onboarding-couple'; }
+        const coupleData = await coupleService.me();
+        if (!coupleData.in_couple) {
+          // Rediriger vers onboarding si pas de couple
+          window.location.href = '/onboarding-couple';
+          return;
+        }
+      } catch (error) {
+        // Si erreur lors de la vérification du couple, rediriger vers onboarding
+        window.location.href = '/onboarding-couple';
+        return;
+      }
+      
+      // Si tout va bien, utiliser la fonction onLogin
+      if (onLogin) {
+        onLogin(access_token, user);
+      } else {
+        // Fallback - recharger la page
+        window.location.href = '/';
+      }
+      
     } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Erreur login:', err);
       setError(err.response?.data?.message || err.message || 'Erreur');
     }
     setLoading(false);
@@ -133,6 +176,19 @@ export default function Login() {
       <Card>
         <Title>US</Title>
         <Subtitle>{mode === 'login' ? 'Connexion à notre espace ' : 'Créer ton compte '}</Subtitle>
+        
+        {/* Indicateur de statut API */}
+        <div style={{ 
+          fontSize: '12px', 
+          padding: '8px', 
+          marginBottom: '10px', 
+          borderRadius: '8px',
+          background: apiStatus === 'online' ? '#e8f5e8' : apiStatus === 'offline' ? '#ffe8e8' : '#fff3cd',
+          color: apiStatus === 'online' ? '#28a745' : apiStatus === 'offline' ? '#dc3545' : '#856404'
+        }}>
+          🌐 API: {apiStatus === 'online' ? '✅ En ligne' : apiStatus === 'offline' ? '❌ Hors ligne' : '⏳ Vérification...'}
+        </div>
+        
         {error && <ErrorMsg>{error}</ErrorMsg>}
         <Form onSubmit={handleSubmit}>
           {mode === 'register' && (
