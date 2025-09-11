@@ -31,8 +31,14 @@ const ToggleButton = styled.button`
 `;
 
 function PWADiagnostic() {
-  const [showDiagnostic, setShowDiagnostic] = useState(false);
+  // Auto-ouverture si pas de token ou si ?diag=1 dans l'URL
+  const shouldAutoOpen = !localStorage.getItem('us_token') || window.location.search.includes('diag=1');
+  const [showDiagnostic, setShowDiagnostic] = useState(shouldAutoOpen);
   const [diagnosticInfo, setDiagnosticInfo] = useState([]);
+  const [version] = useState(() => {
+    // Version simple basée sur date build chargee
+    return 'v' + new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
+  });
 
   useEffect(() => {
     const info = [];
@@ -42,7 +48,7 @@ function PWADiagnostic() {
     info.push(`🌐 URL: ${window.location.href}`);
     info.push(`📦 Local Storage Items: ${localStorage.length}`);
     
-    // Vérifier le token
+  // Vérifier le token
     const token = localStorage.getItem('us_token');
     const userData = localStorage.getItem('us_user');
     info.push(`🔑 Token présent: ${!!token}`);
@@ -78,6 +84,11 @@ function PWADiagnostic() {
     // Network
     info.push(`📶 Online: ${navigator.onLine}`);
     
+    // Ajouter info sur dimensions viewport
+    info.push(`📐 Viewport: ${window.innerWidth}x${window.innerHeight}`);
+    info.push(`🕒 Chargé à: ${new Date().toLocaleTimeString()}`);
+    info.push(`🏷️ Version: ${version}`);
+
     setDiagnosticInfo(info);
   }, []);
 
@@ -109,7 +120,7 @@ function PWADiagnostic() {
     <>
       <DiagnosticContainer>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <strong>🔍 PWA Diagnostic</strong>
+          <strong>🔍 PWA Diagnostic ({version})</strong>
           <button onClick={() => setShowDiagnostic(false)} style={{ background: 'none', border: 'none', color: 'white', cursor: 'pointer' }}>❌</button>
         </div>
         
