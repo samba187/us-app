@@ -24,6 +24,28 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <!-- Shim sécurité: éviter ReferenceError: Notification sur iOS Safari privé / restrictions -->
+    <script>
+      (function(){
+        try {
+          // Si l'API Notification est totalement absente, on crée un faux objet neutre
+          if (typeof Notification === 'undefined') {
+            window.Notification = {
+              permission: 'default',
+              requestPermission: function(cb){
+                var p = Promise.resolve('denied');
+                if (cb) { p.then(cb); }
+                return p;
+              }
+            };
+            console.log('[BOOT] Shim Notification appliqué (API absente)');
+          }
+        } catch(e) {
+          // Ne jamais bloquer le boot
+          console.log('[BOOT] Shim Notification erreur', e);
+        }
+      })();
+    </script>
     <!-- Early boot diagnostic (affiché si React ne monte pas correctement) -->
     <script>
       (function(){

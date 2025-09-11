@@ -1,8 +1,10 @@
 // Service de gestion des notifications PWA
 class NotificationService {
   constructor() {
-    this.isSupported = 'Notification' in window && 'serviceWorker' in navigator;
-    this.permission = Notification.permission;
+    // Sécuriser l'accès à Notification (iOS Safari peut ne pas exposer l'API dans certains contextes)
+    this.hasNotificationGlobal = typeof window !== 'undefined' && typeof window.Notification !== 'undefined';
+    this.isSupported = this.hasNotificationGlobal && 'serviceWorker' in navigator;
+    this.permission = this.hasNotificationGlobal ? window.Notification.permission : 'default';
   }
 
   // Initialiser le service worker et demander la permission
@@ -18,8 +20,12 @@ class NotificationService {
       console.log('Service Worker enregistré:', registration);
 
       // Demander la permission pour les notifications
-      if (this.permission === 'default') {
-        this.permission = await Notification.requestPermission();
+      if (this.permission === 'default' && this.hasNotificationGlobal) {
+        try {
+          this.permission = await window.Notification.requestPermission();
+        } catch (e) {
+          console.log('RequestPermission non disponible:', e);
+        }
       }
 
       return this.permission === 'granted';
@@ -36,10 +42,9 @@ class NotificationService {
 
   // Demander explicitement la permission
   async requestPermission() {
-    if (!this.isSupported) return false;
-    
+    if (!this.isSupported || !this.hasNotificationGlobal) return false;
     try {
-      this.permission = await Notification.requestPermission();
+      this.permission = await window.Notification.requestPermission();
       return this.permission === 'granted';
     } catch (error) {
       console.error('Erreur lors de la demande de permission:', error);
