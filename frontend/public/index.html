@@ -24,6 +24,52 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
+    <!-- Early boot diagnostic (affiché si React ne monte pas correctement) -->
+    <script>
+      (function(){
+        var start = Date.now();
+        window.__BOOT_LOGS = [];
+        function log(msg){
+          var t = ((Date.now()-start)/1000).toFixed(2)+'s';
+          var line = '[BOOT '+t+'] '+msg; window.__BOOT_LOGS.push(line); try{console.log(line);}catch(e){}
+        }
+        window.__logBoot = log;
+        log('Diagnostic initialisé');
+        // Overlay
+        var overlay = document.createElement('div');
+        overlay.id='boot-diagnostic-overlay';
+        overlay.style.cssText='position:fixed;top:0;left:0;right:0;max-height:45vh;overflow:auto;font:12px/1.4 monospace;z-index:999999;background:rgba(20,20,20,0.92);color:#fff;padding:6px 8px;display:none;';
+        var btn = document.createElement('button');
+        btn.textContent='×';
+        btn.onclick=function(){overlay.remove();};
+        btn.style.cssText='position:absolute;top:4px;right:6px;background:#ff6b8a;color:#fff;border:none;border-radius:4px;padding:2px 6px;font-size:14px;cursor:pointer;';
+        var content=document.createElement('pre'); content.style.margin='0'; content.style.whiteSpace='pre-wrap';
+        overlay.appendChild(btn); overlay.appendChild(content);
+        document.body.appendChild(overlay);
+        function refresh(){content.textContent=window.__BOOT_LOGS.join('\n');}
+        window.__showBoot=function(){overlay.style.display='block'; refresh();};
+        window.addEventListener('error', function(e){ log('ERROR: '+e.message+' @'+(e.filename||'')+':'+e.lineno); refresh(); overlay.style.display='block'; });
+        window.addEventListener('unhandledrejection', function(e){ log('PROMISE REJECTION: '+(e.reason && (e.reason.stack||e.reason.message||e.reason))); refresh(); overlay.style.display='block'; });
+        document.addEventListener('DOMContentLoaded', function(){ log('DOMContentLoaded'); });
+        window.addEventListener('load', function(){ log('window load'); setTimeout(checkReact, 500); });
+        function checkReact(){
+          var root = document.getElementById('root');
+          if(!root){ log('root introuvable'); overlay.style.display='block'; refresh(); return; }
+          if(root.children.length === 0){
+            log('Aucun rendu React détecté (root vide)');
+            overlay.style.display='block';
+            log('Conseils: 1) Vérifie console JS 2) Désinstalle version PWA 3) Recharge avec ?diag=1');
+          } else {
+            log('React semble monté ('+root.children.length+' child)');
+            // Auto-masquer après succès si pas de diag demandé
+            if(location.search.indexOf('diag=1')>-1){overlay.style.display='block';}
+          }
+          refresh();
+        }
+        // Auto-afficher si paramètre diag=1
+        if(location.search.indexOf('diag=1')>-1){ setTimeout(function(){ overlay.style.display='block'; refresh(); }, 200); }
+      })();
+    </script>
     
     <!-- Service Worker Registration -->
     <script>
