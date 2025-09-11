@@ -1,72 +1,79 @@
-const CACHE_NAME = 'us-app-v1';
-const urlsToCache = [
+const SW_VERSION = 'v3-' + (self.crypto && crypto.randomUUID ? crypto.randomUUID().slice(0,8) : Date.now());
+const CACHE_RUNTIME = 'runtime-cache';
+const CACHE_STATIC = 'static-cache-v3';
+const CORE_ASSETS = [
   '/',
-  '/static/js/bundle.js',
-  '/static/css/main.css',
+  '/index.html',
   '/manifest.json',
-  'https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap'
+  '/favicon.ico'
 ];
 
 // Installation du service worker
-self.addEventListener('install', function(event) {
+self.addEventListener('install', (event) => {
+  self.skipWaiting();
   event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(function(cache) {
-        console.log('Cache ouvert');
-        return cache.addAll(urlsToCache);
-      })
-  );
-});
-
-// Activation du service worker
-self.addEventListener('activate', function(event) {
-  event.waitUntil(
-    caches.keys().then(function(cacheNames) {
-      return Promise.all(
-        cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Suppression du cache obsolète:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
+    caches.open(CACHE_STATIC).then(cache => {
+      return cache.addAll(CORE_ASSETS).catch(err => {
+        console.log('[SW] Precache error', err);
+      });
     })
   );
 });
 
+// Activation du service worker
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    (async () => {
+      const names = await caches.keys();
+      await Promise.all(names.filter(n => ![CACHE_STATIC, CACHE_RUNTIME].includes(n)).map(n => caches.delete(n)));
+      clients.claim();
+    })()
+  );
+});
+
 // Interception des requêtes réseau
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        // Cache hit - return response
-        if (response) {
-          return response;
-        }
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  const url = new URL(req.url);
+  // Only handle same-origin
+  if (url.origin !== self.location.origin) return;
 
-        return fetch(event.request).then(
-          function(response) {
-            // Check if we received a valid response
-            if(!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            // IMPORTANT: Clone the response. A response is a stream
-            // and because we want the browser to consume the response
-            // as well as the cache consuming the response, we need
-            // to clone it so we have two streams.
-            var responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(function(cache) {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        );
-      })
+  // Network-first for HTML (avoid serving stale blank)
+  if (req.mode === 'navigate') {
+    event.respondWith(
+      fetch(req).then(resp => {
+        const copy = resp.clone();
+        caches.open(CACHE_STATIC).then(c => c.put('/', copy));
+        return resp;
+      }).catch(() => caches.match(req).then(r => r || caches.match('/index.html')))
     );
+    return;
+  }
+
+  // Cache-first for static hashed assets
+  if (url.pathname.startsWith('/static/')) {
+    event.respondWith(
+      caches.match(req).then(cached => cached || fetch(req).then(resp => {
+        if (resp && resp.status === 200) {
+          const copy = resp.clone();
+            caches.open(CACHE_RUNTIME).then(c => c.put(req, copy));
+        }
+        return resp;
+      }).catch(() => cached))
+    );
+    return;
+  }
+
+  // Default: try cache then network
+  event.respondWith(
+    caches.match(req).then(cached => cached || fetch(req).then(resp => {
+      if (resp && resp.status === 200 && resp.type === 'basic') {
+        const copy = resp.clone();
+        caches.open(CACHE_RUNTIME).then(c => c.put(req, copy));
+      }
+      return resp;
+    }))
+  );
 });
 
 // Gestion des notifications push
@@ -94,9 +101,7 @@ self.addEventListener('push', event => {
     ]
   };
 
-  event.waitUntil(
-    self.registration.showNotification('US - Notre App de Couple', options)
-  );
+  event.waitUntil(self.registration.showNotification('US - Notre App de Couple', options));
 });
 
 // Gestion des clics sur les notifications
