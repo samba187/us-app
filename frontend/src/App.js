@@ -8,6 +8,7 @@ import Login from './components/Login';
 import Navigation from './components/Navigation';
 import PWAGuide from './components/PWAGuide';
 import NotificationTester from './components/NotificationTester';
+import PWADiagnostic from './components/PWADiagnostic';
 import Home from './pages/Home';
 import Reminders from './pages/Reminders';
 import Restaurants from './pages/Restaurants';
@@ -38,24 +39,42 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    console.log('🔍 App useEffect - Vérification authentification...');
     const token = localStorage.getItem('us_token');
+    const userData = localStorage.getItem('us_user');
+    
+    console.log('Token présent:', !!token);
+    console.log('User data présent:', !!userData);
+    
     if (token) {
       // Vérifier si le token est valide
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
-        if (payload.exp * 1000 > Date.now()) {
+        const isValid = payload.exp * 1000 > Date.now();
+        
+        console.log('Token valide:', isValid);
+        console.log('Token expiration:', new Date(payload.exp * 1000));
+        
+        if (isValid && userData) {
           setIsAuthenticated(true);
-          setUser(JSON.parse(localStorage.getItem('us_user')));
+          setUser(JSON.parse(userData));
+          console.log('✅ Utilisateur authentifié');
         } else {
+          console.log('❌ Token expiré ou données manquantes');
           localStorage.removeItem('us_token');
           localStorage.removeItem('us_user');
         }
       } catch (error) {
+        console.error('❌ Erreur parsing token:', error);
         localStorage.removeItem('us_token');
         localStorage.removeItem('us_user');
       }
+    } else {
+      console.log('❌ Aucun token trouvé');
     }
+    
     setLoading(false);
+    console.log('🏁 App initialization complete');
   }, []);
 
   // Démarrer les notifications croisées quand l'utilisateur est connecté
@@ -105,6 +124,7 @@ function App() {
     return (
       <AppContainer $isAuthenticated={isAuthenticated}>
         <Login onLogin={handleLogin} />
+        <PWADiagnostic />
       </AppContainer>
     );
   }
@@ -130,6 +150,7 @@ function App() {
         {window.location.pathname !== '/onboarding-couple' && <Navigation />}
         <PWAGuide />
         <NotificationTester />
+        <PWADiagnostic />
       </Router>
     </AppContainer>
   );
