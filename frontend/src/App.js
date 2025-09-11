@@ -23,6 +23,7 @@ import Profile from './pages/Profile';
 // Services
 // import { authService } from './services/authService';
 import crossNotificationService from './services/crossNotificationService';
+import { registerPush } from './services/pushService';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -95,6 +96,8 @@ function App() {
     localStorage.setItem('us_user', JSON.stringify(userData));
     setIsAuthenticated(true);
     setUser(userData);
+    // Essayer d'enregistrer le push après un petit délai (permission Notification peut venir plus tard)
+    setTimeout(() => { registerPush(); }, 1500);
   };
 
   const handleLogout = () => {
