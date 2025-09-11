@@ -5,6 +5,7 @@ import './App.css';
 
 // Components
 import Login from './components/Login';
+import ErrorBoundary from './components/ErrorBoundary';
 import Navigation from './components/Navigation';
 import PWAGuide from './components/PWAGuide';
 import NotificationTester from './components/NotificationTester';
@@ -122,36 +123,40 @@ function App() {
 
   if (!isAuthenticated) {
     return (
-      <AppContainer $isAuthenticated={isAuthenticated}>
-        <Login onLogin={handleLogin} />
-        <PWADiagnostic />
-      </AppContainer>
+      <ErrorBoundary>
+        <AppContainer $isAuthenticated={isAuthenticated}>
+          <Login onLogin={handleLogin} />
+          <PWADiagnostic />
+        </AppContainer>
+      </ErrorBoundary>
     );
   }
 
   return (
-    <AppContainer $isAuthenticated={isAuthenticated}>
-      <Router>
-        <MainContent>
-          <Routes>
-            <Route path="/" element={<Home user={user} />} />
-            <Route path="/onboarding-couple" element={<OnboardingCouple />} />
-            <Route path="/reminders" element={<Reminders />} />
-            <Route path="/restaurants" element={<Restaurants />} />
-            <Route path="/activities" element={<Activities />} />
-            <Route path="/wishlist" element={<Wishlist />} />
-            <Route path="/photos" element={<Photos />} />
-            <Route path="/notes" element={<Notes />} />
-            <Route path="/profile" element={<Profile onLogout={handleLogout} />} />
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </MainContent>
-        {/* Ne pas afficher la navigation sur la page onboarding */}
-        {window.location.pathname !== '/onboarding-couple' && <Navigation />}
-        <PWAGuide />
-        <NotificationTester />
-        <PWADiagnostic />
-      </Router>
-    </AppContainer>
+    <ErrorBoundary>
+      <AppContainer $isAuthenticated={isAuthenticated}>
+        <Router>
+          <MainContent>
+            <Routes>
+              <Route path="/" element={<Home user={user} />} />
+              <Route path="/onboarding-couple" element={<OnboardingCouple />} />
+              <Route path="/reminders" element={<Reminders />} />
+              <Route path="/restaurants" element={<Restaurants />} />
+              <Route path="/activities" element={<Activities />} />
+              <Route path="/wishlist" element={<Wishlist />} />
+              <Route path="/photos" element={<Photos />} />
+              <Route path="/notes" element={<Notes />} />
+              <Route path="/profile" element={<Profile onLogout={handleLogout} />} />
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </MainContent>
+          {/* Ne pas afficher la navigation sur la page onboarding */}
+          {window.location.pathname !== '/onboarding-couple' && <Navigation />}
+          <PWAGuide />
+          <NotificationTester />
+          <PWADiagnostic />
+        </Router>
+      </AppContainer>
+    </ErrorBoundary>
   );
 }export default App;
