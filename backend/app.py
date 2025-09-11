@@ -9,6 +9,7 @@ import bcrypt
 import jwt
 import secrets
 import string
+from pywebpush import webpush, WebPushException
 from functools import wraps
 
 # Charger les variables d'environnement
@@ -44,6 +45,9 @@ def handle_preflight():
 # Configuration MongoDB / JWT
 app.config["MONGO_URI"] = os.getenv("MONGO_URI")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "change-me")
+app.config["VAPID_PUBLIC_KEY"] = os.getenv("VAPID_PUBLIC_KEY", "")
+app.config["VAPID_PRIVATE_KEY"] = os.getenv("VAPID_PRIVATE_KEY", "")
+app.config["VAPID_SUBJECT"] = os.getenv("VAPID_SUBJECT", "mailto:admin@example.com")
 
 mongo = PyMongo(app)
 
@@ -72,6 +76,21 @@ def serialize_doc(doc):
         return None
     doc['_id'] = str(doc['_id'])
     return doc
+
+def send_push(subscription, payload):
+    if not app.config['VAPID_PUBLIC_KEY'] or not app.config['VAPID_PRIVATE_KEY']:
+        return False, 'VAPID keys missing'
+    try:
+        webpush(
+            subscription_info=subscription,
+            data=payload,
+            vapid_private_key=app.config['VAPID_PRIVATE_KEY'],
+            vapid_public_key=app.config['VAPID_PUBLIC_KEY'],
+            vapid_claims={"sub": app.config['VAPID_SUBJECT']}
+        )
+        return True, None
+    except WebPushException as ex:
+        return False, str(ex)
 
 # Routes d'authentification
 @app.route('/api/register', methods=['POST'])
@@ -180,7 +199,29 @@ def create_reminder(current_user_id):
     result = mongo.db.reminders.insert_one(reminder)
     reminder['_id'] = str(result.inserted_id)
     
-    return jsonify(serialize_doc(reminder)), 201
+    reminder_doc = serialize_doc(reminder)
+
+    # Envoyer push aux autres utilisateurs (simple diffusion)
+    try:
+        subs = list(mongo.db.push_subscriptions.find())
+        payload = jsonify({
+            'type': 'reminder_created',
+            'title': reminder['title'],
+            'priority': reminder['priority'],
+        }).get_data(as_text=True)
+        for sub in subs:
+            # Ne pas notifier le créateur si souhaité (ici on notifie tout le monde sauf créateur)
+            if sub.get('user_id') == current_user_id:
+                continue
+            success, err = send_push(sub['subscription'], payload)
+            if not success:
+                # Nettoyer si subscription invalide
+                if '410' in (err or '') or 'expired' in (err or ''):
+                    mongo.db.push_subscriptions.delete_one({'_id': sub['_id']})
+    except Exception as e:
+        pass
+
+    return jsonify(reminder_doc), 201
 
 @app.route('/api/reminders/<reminder_id>', methods=['PUT'])
 @token_required
@@ -333,6 +374,37 @@ def create_note(current_user_id):
     note['_id'] = str(result.inserted_id)
     
     return jsonify(serialize_doc(note)), 201
+
+# ---- PUSH NOTIFICATIONS ----
+@app.route('/api/push/public-key', methods=['GET'])
+def get_public_key():
+    return jsonify({'publicKey': app.config['VAPID_PUBLIC_KEY']}), 200
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@token_required
+def subscribe_push(current_user_id):
+    data = request.get_json()
+    if 'endpoint' not in data or 'keys' not in data:
+        return jsonify({'message': 'Invalid subscription'}), 400
+    # Upsert par user + endpoint
+    mongo.db.push_subscriptions.update_one(
+        {'user_id': current_user_id, 'endpoint': data['endpoint']},
+        {'$set': {'user_id': current_user_id, 'endpoint': data['endpoint'], 'subscription': data, 'updated_at': datetime.utcnow()}},
+        upsert=True
+    )
+    return jsonify({'message': 'Subscribed'}), 201
+
+@app.route('/api/push/test', methods=['POST'])
+@token_required
+def test_push(current_user_id):
+    sub = mongo.db.push_subscriptions.find_one({'user_id': current_user_id})
+    if not sub:
+        return jsonify({'message': 'No subscription'}), 404
+    payload = jsonify({'type': 'test', 'title': 'Test Push', 'body': 'Ça marche !'}).get_data(as_text=True)
+    success, err = send_push(sub['subscription'], payload)
+    if not success:
+        return jsonify({'message': 'Failed', 'error': err}), 500
+    return jsonify({'message': 'Sent'}), 200
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))

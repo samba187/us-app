@@ -78,48 +78,30 @@ self.addEventListener('fetch', (event) => {
 
 // Gestion des notifications push
 self.addEventListener('push', event => {
+  let data = {};
+  try { if (event.data) data = JSON.parse(event.data.text()); } catch(e) { data = { title: 'Notification', body: event.data && event.data.text() }; }
+  const title = data.title || 'US';
   const options = {
-    body: event.data ? event.data.text() : 'Nouveau rappel ajouté !',
+    body: data.body || 'Nouvelle activité',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
-    vibrate: [100, 50, 100],
-    data: {
-      dateOfArrival: Date.now(),
-      primaryKey: '1'
-    },
+    data,
+    vibrate: [80,40,80],
     actions: [
-      {
-        action: 'explore',
-        title: 'Voir le rappel',
-        icon: '/favicon.ico'
-      },
-      {
-        action: 'close',
-        title: 'Fermer',
-        icon: '/favicon.ico'
-      }
+      { action: 'open', title: 'Ouvrir', icon: '/favicon.ico' },
+      { action: 'close', title: 'Fermer', icon: '/favicon.ico' }
     ]
   };
-
-  event.waitUntil(self.registration.showNotification('US - Notre App de Couple', options));
+  event.waitUntil(self.registration.showNotification(title, options));
 });
 
 // Gestion des clics sur les notifications
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-
-  if (event.action === 'explore') {
-    // Ouvrir l'app sur la page rappels
-    event.waitUntil(
-      clients.openWindow('/rappels')
-    );
-  } else if (event.action === 'close') {
-    // Fermer la notification
-    event.notification.close();
-  } else {
-    // Clic sur la notification principale
-    event.waitUntil(
-      clients.openWindow('/')
-    );
-  }
+  const data = event.notification.data || {};
+  let target = '/';
+  if (data.type === 'reminder_created') target = '/reminders';
+  if (data.url) target = data.url;
+  if (event.action === 'close') return;
+  event.waitUntil(clients.openWindow(target));
 });
