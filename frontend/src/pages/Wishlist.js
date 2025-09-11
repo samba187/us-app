@@ -7,12 +7,9 @@ import crossNotificationService from '../services/crossNotificationService';
 const WishlistContainer = styled.div`
   padding: 20px;
   padding-bottom: 120px;
-`    setFormData({
-      title: item.title || '',
-      description: item.description || '',
-      link_url: item.link_url || '',
-      files: null
-    });nst Header = styled.div`
+`;
+
+const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -265,19 +262,6 @@ const TextArea = styled.textarea`
   }
 `;
 
-const Select = styled.select`
-  padding: 12px;
-  border: 2px solid var(--border-color);
-  border-radius: 8px;
-  font-size: 16px;
-  background: white;
-
-  &:focus {
-    outline: none;
-    border-color: var(--primary-color);
-  }
-`;
-
 const FileInput = styled.input`
   padding: 12px;
   border: 2px solid var(--border-color);
@@ -381,7 +365,7 @@ function Wishlist() {
       if (editingItem) {
         await wishlistService.update(editingItem._id, itemData);
       } else {
-        const newItem = await wishlistService.create(itemData);
+        await wishlistService.create(itemData);
         
         // Déclencher les notifications croisées
         setTimeout(() => {

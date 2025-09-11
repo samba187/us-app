@@ -169,34 +169,30 @@ class CrossNotificationService {
   async notifyPartnerActivity(type, data) {
     if (!notificationService.isEnabled()) return;
 
-    let title, body, icon, url;
+    let title, body, url;
 
     switch (type) {
       case 'reminder':
         title = '📝 Nouveau rappel';
         body = `Ton/ta partenaire a ajouté: "${data.title}"`;
-        icon = '📝';
         url = '/rappels';
         break;
         
       case 'wishlist':
         title = '🎁 Nouvel item wishlist';
         body = `Ton/ta partenaire veut: "${data.title}"`;
-        icon = '🎁';
         url = '/wishlist';
         break;
         
       case 'activity':
         title = '🎯 Nouvelle activité';
         body = `Ton/ta partenaire a ajouté: "${data.title}"`;
-        icon = '🎯';
         url = '/activites';
         break;
         
       case 'restaurant':
         title = '🍽️ Nouveau restaurant';
         body = `Ton/ta partenaire a ajouté: "${data.name}"`;
-        icon = '🍽️';
         url = '/restaurants';
         break;
         
