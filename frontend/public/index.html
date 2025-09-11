@@ -71,19 +71,48 @@
       })();
     </script>
     
-    <!-- Service Worker Registration -->
+    <!-- Service Worker Registration améliorée (mise à jour forcée + mode réparation) -->
     <script>
-      if ('serviceWorker' in navigator) {
+      (function(){
+        const repair = location.search.includes('repair=1');
+        const disable = location.search.includes('nosw=1');
+        if (!('serviceWorker' in navigator)) return;
+        if (disable) { console.log('[BOOT] SW disabled via nosw=1'); return; }
         window.addEventListener('load', function() {
-          navigator.serviceWorker.register('/sw.js')
-            .then(function(registration) {
-              console.log('SW registered: ', registration);
-            })
-            .catch(function(registrationError) {
-              console.log('SW registration failed: ', registrationError);
+          if (repair) {
+            navigator.serviceWorker.getRegistrations().then(regs => {
+              return Promise.all(regs.map(r => r.unregister()));
+            }).then(() => { console.log('[BOOT] SW unregistered (repair)'); location.replace(location.pathname+'?'+Date.now()); });
+            return;
+          }
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('[BOOT] SW registered', reg.scope);
+            if (reg.waiting) { reg.waiting.postMessage({type:'SKIP_WAITING'}); }
+            reg.addEventListener('updatefound', () => {
+              const nw = reg.installing; if (nw) { nw.addEventListener('statechange', () => { if (nw.state==='installed' && navigator.serviceWorker.controller) { console.log('[BOOT] New SW installed, reloading'); location.reload(); } }); }
             });
+          }).catch(err => console.log('[BOOT] SW registration failed', err));
         });
-      }
+      })();
+    </script>
+    <!-- Fallback: tentative de chargement manuel du bundle si React ne monte pas -->
+    <script>
+      (function(){
+        function lateCheck(){
+          var root = document.getElementById('root');
+          if(root && root.children.length===0){
+            console.log('[BOOT] Root still empty after 3s - attempting manual asset-manifest fetch');
+            fetch('/asset-manifest.json',{cache:'no-store'}).then(r=>r.json()).then(manifest=>{
+              var mainJs = manifest.files && (manifest.files['main.js'] || manifest.files['main.cjs'] || manifest.files['main']);
+              if(!mainJs){ console.log('[BOOT] No main.js in manifest', manifest); return; }
+              if(document.querySelector('script[data-manual-loaded]')) return;
+              var s=document.createElement('script'); s.src=mainJs; s.dataset.manualLoaded='1'; document.body.appendChild(s);
+              setTimeout(()=>{ if(root.children.length===0){ console.log('[BOOT] Manual load failed'); if(window.__showBoot) window.__showBoot(); } },2000);
+            }).catch(e=>{ console.log('[BOOT] asset-manifest fetch failed', e); if(window.__showBoot) window.__showBoot();});
+          }
+        }
+        setTimeout(lateCheck,3000);
+      })();
     </script>
   </body>
 </html>
