@@ -206,8 +206,10 @@ def create_reminder(current_user_id):
         subs = list(mongo.db.push_subscriptions.find())
         payload = jsonify({
             'type': 'reminder_created',
-            'title': reminder['title'],
+            'title': 'Nouveau rappel',
+            'body': f"{reminder['title']} (prio: {reminder['priority']})",
             'priority': reminder['priority'],
+            'url': '/reminders'
         }).get_data(as_text=True)
         for sub in subs:
             # Ne pas notifier le créateur si souhaité (ici on notifie tout le monde sauf créateur)
@@ -323,7 +325,22 @@ def create_wishlist_item(current_user_id):
     
     result = mongo.db.wishlist_items.insert_one(item)
     item['_id'] = str(result.inserted_id)
-    
+
+    # Push notification wishlist
+    try:
+        subs = list(mongo.db.push_subscriptions.find())
+        payload = jsonify({
+            'type': 'wishlist_created',
+            'title': 'Wishlist',
+            'body': f"Nouvel item: {item['title']}",
+            'url': '/wishlist'
+        }).get_data(as_text=True)
+        for sub in subs:
+            if sub.get('user_id') == current_user_id:
+                continue
+            send_push(sub['subscription'], payload)
+    except Exception:
+        pass
     return jsonify(serialize_doc(item)), 201
 
 # Routes pour les photos
