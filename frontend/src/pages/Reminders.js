@@ -3,6 +3,7 @@ import styled from 'styled-components';
 import { FiPlus, FiCheck, FiClock, FiAlertCircle } from 'react-icons/fi';
 import { reminderService } from '../services/authService';
 import notificationService from '../services/notificationService';
+import crossNotificationService from '../services/crossNotificationService';
 import NotificationSettings from '../components/NotificationSettings';
 
 const RemindersContainer = styled.div`
@@ -349,7 +350,7 @@ function Reminders() {
         const result = await reminderService.create(formData);
         reminder = result;
         
-        // Notification pour nouveau rappel
+        // Notification locale pour l'utilisateur actuel
         const notificationSettings = JSON.parse(localStorage.getItem('notification_settings') || '{}');
         if (notificationSettings.newReminders !== false) {
           await notificationService.notifyNewReminder(reminder);
@@ -361,6 +362,11 @@ function Reminders() {
             }, 1000);
           }
         }
+
+        // 🔔 NOTIFICATION CROISÉE pour le/la partenaire
+        setTimeout(() => {
+          crossNotificationService.triggerImmediateCheck();
+        }, 1000);
       }
       
       setShowModal(false);

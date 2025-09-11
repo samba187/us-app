@@ -20,6 +20,7 @@ import Profile from './pages/Profile';
 
 // Services
 // import { authService } from './services/authService';
+import crossNotificationService from './services/crossNotificationService';
 
 const AppContainer = styled.div`
   min-height: 100vh;
@@ -56,6 +57,18 @@ function App() {
     }
     setLoading(false);
   }, []);
+
+  // Démarrer les notifications croisées quand l'utilisateur est connecté
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      crossNotificationService.startCrossNotifications();
+      
+      // Arrêter les notifications lors de la déconnexion
+      return () => {
+        crossNotificationService.stopCrossNotifications();
+      };
+    }
+  }, [isAuthenticated, user]);
 
   const handleLogin = (token, userData) => {
     localStorage.setItem('us_token', token);

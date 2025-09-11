@@ -1,14 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiPlus, FiHeart, FiExternalLink } from 'react-icons/fi';
-import { wishlistService } from '../services/authService';
+import { wishlistService, photoService } from '../services/authService';
+import crossNotificationService from '../services/crossNotificationService';
 
 const WishlistContainer = styled.div`
   padding: 20px;
   padding-bottom: 120px;
-`;
-
-const Header = styled.div`
+`    setFormData({
+      title: item.title || '',
+      description: item.description || '',
+      link_url: item.link_url || '',
+      files: null
+    });nst Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -44,7 +48,18 @@ const WishlistCard = styled.div`
 
 const WishlistImage = styled.div`
   height: 120px;
-  background: ${props => props.image ? `url(${props.image})` : 'linear-gradient(135deg, #f093fb, #f5576c)'};
+  background: ${props => {
+    if (props.image) {
+      // Gérer les différents formats de chemin d'image
+      const imagePath = props.image.startsWith('http') 
+        ? props.image 
+        : props.image.startsWith('/') 
+          ? props.image 
+          : `/${props.image}`;
+      return `url(${imagePath})`;
+    }
+    return 'linear-gradient(135deg, #f093fb, #f5576c)';
+  }};
   background-size: cover;
   background-position: center;
   position: relative;
@@ -309,7 +324,6 @@ function Wishlist() {
     title: '',
     description: '',
     link_url: '',
-    for_user: 'user1',
     files: null
   });
 
@@ -339,25 +353,21 @@ function Wishlist() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let imageUrls = [];
+      let imageUrl = '';
       
+      // Upload de l'image si présente
       if (formData.files && formData.files.length > 0) {
         const uploadData = new FormData();
-        for (let file of formData.files) {
-          uploadData.append('files', file);
-        }
+        uploadData.append('files', formData.files[0]); // Prendre la première image
+        uploadData.append('category', 'wishlist');
         
-        const uploadResponse = await fetch('/api/upload', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('us_token')}`
-          },
-          body: uploadData
-        });
-        
-        if (uploadResponse.ok) {
-          const uploadResult = await uploadResponse.json();
-          imageUrls = uploadResult.files || [];
+        try {
+          const uploadResult = await photoService.uploadMultipart(uploadData);
+          if (uploadResult && uploadResult.length > 0) {
+            imageUrl = uploadResult[0].path; // Utiliser le path de l'image uploadée
+          }
+        } catch (uploadError) {
+          console.error('Erreur upload image:', uploadError);
         }
       }
 
@@ -365,20 +375,23 @@ function Wishlist() {
         title: formData.title,
         description: formData.description,
         link_url: formData.link_url,
-        for_user: formData.for_user,
-        images: imageUrls,
-        image_url: imageUrls[0] || ''
+        image_url: imageUrl || editingItem?.image_url || ''
       };
 
       if (editingItem) {
         await wishlistService.update(editingItem._id, itemData);
       } else {
-        await wishlistService.create(itemData);
+        const newItem = await wishlistService.create(itemData);
+        
+        // Déclencher les notifications croisées
+        setTimeout(() => {
+          crossNotificationService.triggerImmediateCheck();
+        }, 1000);
       }
       
       setShowModal(false);
       setEditingItem(null);
-      setFormData({ title: '', description: '', link_url: '', for_user: 'user1', files: null });
+      setFormData({ title: '', description: '', link_url: '', files: null });
       loadWishlist();
     } catch (error) {
       console.error('Erreur:', error);
@@ -417,9 +430,16 @@ function Wishlist() {
     }
   };
 
-  const getUserName = (userId) => {
-    // Dans une vraie app, on récupérerait le nom depuis la base
-    return userId === 'user1' ? 'Toi' : 'Ta copine';
+  const getUserName = (item) => {
+    const currentUser = JSON.parse(localStorage.getItem('us_user') || '{}');
+    
+    // Si l'item a été créé par l'utilisateur actuel
+    if (item.created_by === currentUser._id) {
+      return 'Toi';
+    } else {
+      // Si l'item a été créé par le/la partenaire  
+      return 'Ton/ta partenaire';
+    }
   };
 
   if (loading) {
@@ -438,7 +458,7 @@ function Wishlist() {
         <Title>Wishlist</Title>
         <AddButton onClick={() => {
           setEditingItem(null);
-          setFormData({ title: '', description: '', link_url: '', for_user: 'user1', files: null });
+          setFormData({ title: '', description: '', link_url: '', files: null });
           setShowModal(true);
         }}>
           <FiPlus /> Ajouter
@@ -458,7 +478,7 @@ function Wishlist() {
           
           <WishlistContent>
             <WishlistTitle>{item.title}</WishlistTitle>
-            <ForUser>💝 Pour {getUserName(item.for_user)}</ForUser>
+            <ForUser>💝 Pour {getUserName(item)}</ForUser>
             
             {item.description && (
               <WishlistDescription>{item.description}</WishlistDescription>
@@ -537,14 +557,6 @@ function Wishlist() {
               value={formData.link_url}
               onChange={(e) => setFormData({...formData, link_url: e.target.value})}
             />
-            
-            <Select
-              value={formData.for_user}
-              onChange={(e) => setFormData({...formData, for_user: e.target.value})}
-            >
-              <option value="user1">Pour moi</option>
-              <option value="user2">Pour ma copine/mon copain</option>
-            </Select>
             
             <FileInput
               type="file"
