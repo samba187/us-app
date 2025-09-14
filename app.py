@@ -366,15 +366,48 @@ def activities_delete(u, cid, aid):
 @jwt_required()
 @require_couple
 def wishlist_list(u, cid):
-    items = list(wishlist_col.find({"couple_id": cid}).sort("added_at",-1))
-    return jsonify([serialize(x) for x in items])
+    # Include legacy items that may lack couple_id but were added by members
+    member_ids = []
+    try:
+        c = couples_col.find_one({"_id": cid}, {"members":1})
+        if c:
+            member_ids = c.get("members", [])
+    except Exception:
+        pass
+    query = {"$or": [
+        {"couple_id": cid},
+        {"couple_id": {"$exists": False}, "added_by": {"$in": [str(m) for m in member_ids]}}
+    ]}
+    items = list(wishlist_col.find(query).sort("added_at", -1))
+    # Expand image id references if they look like photo objectids and photos exist
+    enriched = []
+    for it in items:
+        images = it.get("images") or []
+        expanded_images = []
+        for img in images:
+            if isinstance(img, dict):
+                expanded_images.append(img)
+                continue
+            # treat as id referencing photos collection
+            try:
+                ph = photos_col.find_one({"_id": oid(img)})
+                if ph:
+                    expanded_images.append({"_id": str(ph["_id"]), "url": ph.get("url"), "filename": os.path.basename(ph.get("url",""))})
+                else:
+                    expanded_images.append(img)
+            except Exception:
+                expanded_images.append(img)
+        it["images"] = expanded_images
+        enriched.append(serialize(it))
+    return jsonify(enriched)
 
 @app.post("/api/wishlist")
 @jwt_required()
 @require_couple
 def wishlist_create(u, cid):
     data = request.get_json() or {}
-    item = {"title": data["title"], "description": data.get("description",""), "image_url": data.get("image_url",""), "images": data.get("images", []), "link_url": data.get("link_url",""), "for_user": data.get("for_user"), "added_by": str(u["_id"]), "status": data.get("status","idea"), "added_at": dt.datetime.utcnow(), "couple_id": cid}
+    recipient_id = data.get("recipient_id") or data.get("for_user")
+    item = {"title": data["title"], "description": data.get("description",""), "image_url": data.get("image_url",""), "images": data.get("images", []), "link_url": data.get("link_url",""), "for_user": recipient_id, "recipient_id": recipient_id, "added_by": str(u["_id"]), "status": data.get("status","idea"), "added_at": dt.datetime.utcnow(), "couple_id": cid}
     res = wishlist_col.insert_one(item); item["_id"]=str(res.inserted_id)
     try:
         payload = {'type': 'wishlist_created','title': 'Wishlist','body': f"Nouvel item: {item['title']}",'url': '/wishlist'}
@@ -388,9 +421,30 @@ def wishlist_create(u, cid):
 @require_couple
 def wishlist_update(u, cid, wid):
     data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["title","description","image_url","link_url","for_user","status"]}
+    # Accept recipient_id alias
+    if 'recipient_id' in data and 'for_user' not in data:
+        data['for_user'] = data['recipient_id']
+    fields = {k: v for k,v in data.items() if k in ["title","description","image_url","link_url","for_user","recipient_id","status","images"]}
     wishlist_col.update_one({"_id": oid(wid), "couple_id": cid}, {"$set": fields})
     return {"msg":"updated"}
+
+# ───────── Couples (list) ─────────
+@app.get('/api/couples')
+@jwt_required()
+def couples_list():
+    u = current_user()
+    if not u:
+        return {"error": "unauth"}, 401
+    cid = u.get('couple_id')
+    if not cid:
+        return jsonify([])
+    c = couples_col.find_one({'_id': cid})
+    if not c:
+        return jsonify([])
+    # Provide a simple representation with name or members names joined
+    members = list(users_col.find({'_id': {'$in': c.get('members', [])}}, {"password":0}))
+    display_name = c.get('name') or (' & '.join([m.get('name') for m in members if m.get('name')])) or 'Couple'
+    return jsonify([{"_id": str(c['_id']), "name": display_name, "invite_code": c.get('invite_code')}])
 
 @app.delete("/api/wishlist/<wid>")
 @jwt_required()
