@@ -4,39 +4,68 @@ import { FiPlus, FiExternalLink } from 'react-icons/fi';
 import { authService } from '../services/authService';
 
 const Container = styled.div`
-  padding: 20px;
+  padding: 15px;
   max-width: 800px;
   margin: 0 auto;
+  
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
 `;
 
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
+  gap: 10px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 15px;
+  }
 `;
 
 const Title = styled.h1`
   margin: 0;
   color: var(--text-color);
+  font-size: 24px;
+  
+  @media (max-width: 768px) {
+    font-size: 20px;
+    text-align: center;
+  }
 `;
 
 const AddButton = styled.button`
   background: var(--primary-color);
   color: white;
   border: none;
-  padding: 12px 20px;
+  padding: 15px 25px;
   border-radius: 25px;
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   cursor: pointer;
   font-weight: 500;
+  font-size: 16px;
+  min-height: 50px;
   transition: all 0.2s;
+  white-space: nowrap;
 
   &:hover {
     transform: translateY(-2px);
     box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  }
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    padding: 18px 25px;
+    font-size: 18px;
+    border-radius: 12px;
+    min-height: 56px;
   }
 `;
 
@@ -239,6 +268,12 @@ const Modal = styled.div`
   justify-content: center;
   z-index: 1000;
   padding: 20px;
+  
+  @media (max-width: 768px) {
+    padding: 10px;
+    align-items: flex-start;
+    padding-top: 20px;
+  }
 `;
 
 const ModalContent = styled.div`
@@ -247,8 +282,14 @@ const ModalContent = styled.div`
   padding: 30px;
   width: 100%;
   max-width: 500px;
-  max-height: 80vh;
+  max-height: 90vh;
   overflow-y: auto;
+  
+  @media (max-width: 768px) {
+    padding: 20px;
+    border-radius: 12px;
+    max-height: 85vh;
+  }
 `;
 
 const ModalTitle = styled.h2`
@@ -273,6 +314,7 @@ const Input = styled.input`
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 16px;
+  box-sizing: border-box;
   
   &:focus {
     outline: none;
@@ -288,6 +330,7 @@ const TextArea = styled.textarea`
   font-size: 16px;
   min-height: 100px;
   resize: vertical;
+  box-sizing: border-box;
   
   &:focus {
     outline: none;
@@ -301,6 +344,7 @@ const Select = styled.select`
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 16px;
+  box-sizing: border-box;
   
   &:focus {
     outline: none;
@@ -322,15 +366,27 @@ const ModalButton = styled.button`
   cursor: pointer;
   font-size: 16px;
   font-weight: 500;
+  min-height: 48px;
   
   &.primary {
     background: var(--primary-color);
     color: white;
+    
+    &:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
   }
   
   &.secondary {
     background: var(--border-color);
     color: var(--text-color);
+  }
+  
+  @media (max-width: 768px) {
+    flex: 1;
+    padding: 15px;
+    font-size: 16px;
   }
 `;
 
@@ -456,31 +512,48 @@ function Wishlist() {
 
   const loadCouples = async () => {
     try {
+      console.log('Loading couples...');
       const response = await authService.api.get('/api/couples');
+      console.log('Couples loaded:', response.data);
       setCouples(response.data);
     } catch (error) {
       console.error('Erreur lors du chargement des couples:', error);
+      // Pas de couples = pas grave, on peut quand même utiliser "Moi"
+      setCouples([]);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     
+    if (!formData.title.trim()) {
+      alert('Le titre est obligatoire');
+      return;
+    }
+    
     try {
       let uploadedImages = [];
       
       if (imageFiles.length > 0) {
+        console.log('Uploading images:', imageFiles.length);
         const uploadPromises = imageFiles.map(file => 
           authService.photoService.uploadMultipart([file])
         );
         const uploadResults = await Promise.all(uploadPromises);
         uploadedImages = uploadResults.flat();
+        console.log('Images uploaded:', uploadedImages);
       }
 
       const wishlistData = {
-        ...formData,
+        title: formData.title,
+        description: formData.description,
+        link_url: formData.link_url,
+        recipient_id: formData.recipient_id,
+        status: formData.status,
         images: uploadedImages.map(img => img._id)
       };
+      
+      console.log('Sending wishlist data:', wishlistData);
 
       if (editingItem) {
         await authService.api.put(`/api/wishlist/${editingItem._id}`, wishlistData);
@@ -488,10 +561,12 @@ function Wishlist() {
         await authService.api.post('/api/wishlist', wishlistData);
       }
       
+      console.log('Wishlist item saved successfully');
       await loadWishlist();
       handleCloseModal();
     } catch (error) {
       console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -736,7 +811,7 @@ function Wishlist() {
                 <ModalButton type="button" className="secondary" onClick={handleCloseModal}>
                   Annuler
                 </ModalButton>
-                <ModalButton type="submit" className="primary">
+                <ModalButton type="submit" className="primary" disabled={!formData.title.trim()}>
                   {editingItem ? 'Modifier' : 'Ajouter'}
                 </ModalButton>
               </ModalActions>
