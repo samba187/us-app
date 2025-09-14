@@ -1,683 +1,361 @@
-# app.py
-import os, re, secrets, string, datetime as dt
-from uuid import uuid4
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from flask_pymongo import PyMongo
+from bson import ObjectId
+from datetime import datetime, timedelta
+import os
+from dotenv import load_dotenv
+import bcrypt
+import jwt
 from functools import wraps
 
-from dotenv import load_dotenv
-from flask import Flask, jsonify, request, send_from_directory
-from flask_cors import CORS
-from pymongo import MongoClient
-from bson.objectid import ObjectId
-from werkzeug.security import generate_password_hash, check_password_hash
-from flask_jwt_extended import (
-    JWTManager, create_access_token, jwt_required, get_jwt_identity
-)
-
-# ───────── Boot ─────────
+# Charger les variables d'environnement
 load_dotenv()
+
 app = Flask(__name__)
-app.url_map.strict_slashes = False
+CORS(app)
 
-# JWT
-app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "change-me")
-app.config["JWT_ACCESS_TOKEN_EXPIRES"] = dt.timedelta(days=30)
-jwt = JWTManager(app)
+# Configuration MongoDB
+app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 
-# Mongo
-MONGODB_URI = os.getenv("MONGODB_URI", "mongodb://127.0.0.1:27017/")
-MONGODB_DB  = os.getenv("MONGODB_DB", "us_app")
-client = MongoClient(MONGODB_URI)   # lazy connect
-db = client[MONGODB_DB]
+mongo = PyMongo(app)
 
-# Collections
-users_col       = db["users"]
-couples_col     = db["couples"]
-reminders_col   = db["reminders"]
-restaurants_col = db["restaurants"]
-activities_col  = db["activities"]
-wishlist_col    = db["wishlist_items"]
-photos_col      = db["photos"]
-notes_col       = db["notes"]
-push_subs_col   = db["push_subscriptions"]
-
-# CORS (laisser flask-cors gérer, pas d'after_request)
-origins = [o.strip() for o in os.getenv(
-    "CORS_ORIGINS",
-    "https://dancing-chaja-15f8a5.netlify.app,http://localhost:3000"
-).split(",") if o.strip()]
-if os.getenv("ALLOW_NETLIFY_PREVIEWS", "false").lower() in ("1","true","yes"):
-    origins.append(re.compile(r"^https://.*\.netlify\.app$"))
-
-CORS(
-    app,
-    resources={r"/api/*": {
-        "origins": origins,
-        "methods": ["GET","POST","PUT","DELETE","OPTIONS"],
-        "allow_headers": ["Content-Type","Authorization","X-Requested-With"],
-        "supports_credentials": False
-    }},
-    vary_header=True, intercept_exceptions=True, always_send=True
-)
-
-@app.route("/api/<path:_any>", methods=["OPTIONS"])
-def cors_preflight(_any):
-    return ("", 204)
-
-# ───────── Helpers ─────────
-def oid(v):
-    try: return ObjectId(v)
-    except: return None
-
-def serialize(doc):
-    if not doc: return None
-    d = dict(doc)
-    if "_id" in d: d["_id"] = str(d["_id"])
-    if "couple_id" in d and isinstance(d["couple_id"], ObjectId):
-        d["couple_id"] = str(d["couple_id"])
-    return d
-
-def iso_to_dt(val):
-    if not val: return None
-    try:
-        s = str(val)
-        if s.endswith("Z"): s = s[:-1] + "+00:00"
-        return dt.datetime.fromisoformat(s)
-    except: return None
-
-def new_invite_code(n=6):  # 6 chars to align with frontend input constraint
-    alphabet = string.ascii_uppercase + string.digits
-    return ''.join(secrets.choice(alphabet) for _ in range(n))
-
-UPLOAD_DIR = os.path.join(os.path.dirname(__file__), 'uploads')
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-def save_file(f):
-    """Save a Werkzeug FileStorage and return public URL path."""
-    ext = os.path.splitext(f.filename or '')[1][:8]
-    name = f"{uuid4().hex}{ext}"
-    path = os.path.join(UPLOAD_DIR, name)
-    f.save(path)
-    return f"/uploads/{name}"
-
-def ensure_indexes():
-    try:
-        users_col.create_index("email", unique=True)
-        users_col.create_index("couple_id")
-        couples_col.create_index("invite_code", unique=True)
-
-        for col in (reminders_col, restaurants_col, activities_col, wishlist_col, photos_col, notes_col, push_subs_col):
-            col.create_index("couple_id")
-            for fld in ("created_at","added_at","uploaded_at"):
-                try: col.create_index([(fld, -1)])
-                except: pass
-    except Exception as e:
-        print("WARN ensure_indexes:", e)
-
-def current_user():
-    email = get_jwt_identity()
-    return users_col.find_one({"email": email})
-
-def require_couple(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        u = current_user()
-        cid = u.get("couple_id") if u else None
-        if not cid:
-            return {"error": "not_in_couple"}, 409
-        return fn(u, cid, *args, **kwargs)
-    return wrapper
-
-# ───────── Health ─────────
-@app.get("/")
-def root():
-    return {"status": "ok", "docs": ["/health", "/api/health"]}
-
-@app.get("/health")
-def health_root():
-    return {"status": "ok", "scope": "root"}
-
-@app.get("/api/health")
-@app.get("/api/health/")
-def health_api():
-    ensure_indexes()
-    return {"status": "ok", "scope": "api", "time": dt.datetime.utcnow().isoformat()+"Z"}
-
-# ───────── Auth ─────────
-@app.post("/api/register")
-def register():
-    data = request.get_json() or {}
-    name  = (data.get("name") or "").strip()
-    email = (data.get("email") or "").lower().strip()
-    pwd   = data.get("password") or ""
-    if not (name and email and pwd):
-        return {"error":"missing_fields"}, 400
-    if users_col.find_one({"email": email}):
-        return {"error":"email_exists"}, 400
-
-    hashed = generate_password_hash(pwd)
-    user = {
-        "name": name,
-        "email": email,
-        "password": hashed,
-        "avatar_url": data.get("avatar_url",""),
-        "joined_at": dt.datetime.utcnow(),
-        "couple_id": None
-    }
-    res = users_col.insert_one(user)
-    token = create_access_token(identity=email)
-    return {
-        "access_token": token,
-        "user": {"id": str(res.inserted_id), "name": name, "email": email, "avatar_url": user["avatar_url"]}
-    }, 201
-
-@app.post("/api/login")
-def login():
-    data = request.get_json() or {}
-    email = (data.get("email") or "").lower().strip()
-    pwd   = data.get("password") or ""
-    user  = users_col.find_one({"email": email})
-    if not user or not check_password_hash(user["password"], pwd):
-        return {"error":"invalid_credentials"}, 401
-    token = create_access_token(identity=email)
-    return {
-        "access_token": token,
-        "user": {"id": str(user["_id"]), "name": user["name"], "email": user["email"], "avatar_url": user.get("avatar_url","")}
-    }
-
-@app.get("/api/users")
-@jwt_required()
-def get_users():
-    users = list(users_col.find({}, {"password":0}).sort("joined_at", 1))
-    return jsonify([serialize(u) for u in users])
-
-# ───────── Couple: create / invite / join / me ─────────
-@app.post("/api/couple/create")
-@jwt_required()
-def couple_create():
-    u = current_user()
-    if u.get("couple_id"):
-        return {"error":"already_in_couple"}, 400
-    code = new_invite_code()
-    couple = {"invite_code": code, "members": [u["_id"]], "name": None, "created_at": dt.datetime.utcnow()}
-    res = couples_col.insert_one(couple)
-    users_col.update_one({"_id": u["_id"]}, {"$set": {"couple_id": res.inserted_id}})
-    return {"couple_id": str(res.inserted_id), "invite_code": code}
-
-@app.post("/api/couple/invite/refresh")
-@jwt_required()
-def couple_invite_refresh():
-    u = current_user()
-    cid = u.get("couple_id")
-    if not cid: return {"error":"no_couple"}, 400
-    code = new_invite_code()
-    couples_col.update_one({"_id": cid}, {"$set": {"invite_code": code}})
-    return {"invite_code": code}
-
-@app.post("/api/couple/join")
-@jwt_required()
-def couple_join():
-    u = current_user()
-    if u.get("couple_id"):
-        return {"error":"already_in_couple"}, 400
-    data = request.get_json() or {}
-    code = (data.get("invite_code") or "").upper().strip()
-    c = couples_col.find_one({"invite_code": code})
-    if not c: return {"error":"invalid_code"}, 404
-    if len(c["members"]) >= 2:   # limite stricte à 2 membres
-        return {"error":"couple_full"}, 400
-    couples_col.update_one({"_id": c["_id"]}, {"$addToSet": {"members": u["_id"]}})
-    users_col.update_one({"_id": u["_id"]}, {"$set": {"couple_id": c["_id"]}})
-    return {"ok": True, "couple_id": str(c["_id"])}
-
-@app.get("/api/couple/me")
-@jwt_required()
-def couple_me():
-    u = current_user()
-    cid = u.get("couple_id")
-    if not cid:
-        return {"in_couple": False}
-    c = couples_col.find_one({"_id": cid})
-    members = list(users_col.find({"_id": {"$in": c["members"]}}, {"password":0}))
-    return {
-        "in_couple": True,
-        "couple_id": str(cid),
-        "invite_code": c.get("invite_code"),
-        "members": [{"id": str(m["_id"]), "name": m["name"], "email": m["email"], "avatar_url": m.get("avatar_url","")} for m in members]
-    }
-
-# ───────── Reminders ─────────
-@app.get("/api/reminders")
-@jwt_required()
-@require_couple
-def reminders_list(u, cid):
-    items = list(reminders_col.find({"couple_id": cid}).sort("created_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.post("/api/reminders")
-@jwt_required()
-@require_couple
-def reminders_create(u, cid):
-    data = request.get_json() or {}
-    item = {
-        "title": data["title"],
-        "description": data.get("description",""),
-        "created_by": str(u["_id"]),
-        "assigned_to": data.get("assigned_to"),
-        "priority": data.get("priority","normal"),
-        "due_date": iso_to_dt(data.get("due_date")),
-        "status": "pending",
-        "created_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = reminders_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    # Push
-    try:
-        payload = {
-            'type': 'reminder_created',
-            'title': 'Nouveau rappel',
-            'body': f"{item['title']} (prio: {item['priority']})",
-            'url': '/reminders'
-        }
-        broadcast_push(cid, u['email'], payload)
-    except Exception as e:
-        if DEBUG_PUSH:
-            print('[PUSH][REMINDER][ERROR]', e)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/reminders/<rid>")
-@jwt_required()
-@require_couple
-def reminders_update(u, cid, rid):
-    data = request.get_json() or {}
-    if "due_date" in data: data["due_date"] = iso_to_dt(data.get("due_date"))
-    reminders_col.update_one({"_id": oid(rid), "couple_id": cid}, {"$set": data})
-    return {"msg":"updated"}
-
-@app.delete("/api/reminders/<rid>")
-@jwt_required()
-@require_couple
-def reminders_delete(u, cid, rid):
-    reminders_col.delete_one({"_id": oid(rid), "couple_id": cid})
-    return {"msg":"deleted"}
-
-# ───────── Restaurants ─────────
-@app.get("/api/restaurants")
-@jwt_required()
-@require_couple
-def restaurants_list(u, cid):
-    items = list(restaurants_col.find({"couple_id": cid}).sort("added_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.get('/api/restaurants/<rid>')
-@jwt_required()
-@require_couple
-def restaurants_get(u, cid, rid):
-    doc = restaurants_col.find_one({"_id": oid(rid), "couple_id": cid})
-    if not doc:
-        return {"error":"not_found"}, 404
-    return jsonify(serialize(doc))
-
-@app.post("/api/restaurants")
-@jwt_required()
-@require_couple
-def restaurants_create(u, cid):
-    data = request.get_json() or {}
-    item = {
-        "name": data["name"],
-        "address": data.get("address",""),
-        "map_url": data.get("map_url",""),
-        "image_url": data.get("image_url",""),
-    "images": data.get("images", []),
-        "status": data.get("status","to_try"),
-        "notes": data.get("notes",""),
-        "added_by": str(u["_id"]),
-        "added_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = restaurants_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/restaurants/<rid>")
-@jwt_required()
-@require_couple
-def restaurants_update(u, cid, rid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["name","address","map_url","image_url","status","notes","images"]}
-    restaurants_col.update_one({"_id": oid(rid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/restaurants/<rid>")
-@jwt_required()
-@require_couple
-def restaurants_delete(u, cid, rid):
-    restaurants_col.delete_one({"_id": oid(rid), "couple_id": cid})
-    return {"msg":"deleted"}
-
-# ───────── Activities ─────────
-@app.get("/api/activities")
-@jwt_required()
-@require_couple
-def activities_list(u, cid):
-    items = list(activities_col.find({"couple_id": cid}).sort("added_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.get('/api/activities/<aid>')
-@jwt_required()
-@require_couple
-def activities_get(u, cid, aid):
-    doc = activities_col.find_one({"_id": oid(aid), "couple_id": cid})
-    if not doc:
-        return {"error":"not_found"}, 404
-    return jsonify(serialize(doc))
-
-@app.post("/api/activities")
-@jwt_required()
-@require_couple
-def activities_create(u, cid):
-    data = request.get_json() or {}
-    item = {
-        "title": data["title"],
-        "category": data.get("category","other"),
-        "status": data.get("status","planned"),
-        "notes": data.get("notes",""),
-    "images": data.get("images", []),
-        "image_url": data.get("image_url",""),
-        "added_by": str(u["_id"]),
-        "added_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = activities_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/activities/<aid>")
-@jwt_required()
-@require_couple
-def activities_update(u, cid, aid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["title","category","status","notes","image_url","images"]}
-    activities_col.update_one({"_id": oid(aid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/activities/<aid>")
-@jwt_required()
-@require_couple
-def activities_delete(u, cid, aid):
-    activities_col.delete_one({"_id": oid(aid), "couple_id": cid})
-    return {"msg":"deleted"}
-
-# ───────── Wishlist ─────────
-@app.get("/api/wishlist")
-@jwt_required()
-@require_couple
-def wishlist_list(u, cid):
-    items = list(wishlist_col.find({"couple_id": cid}).sort("added_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.post("/api/wishlist")
-@jwt_required()
-@require_couple
-def wishlist_create(u, cid):
-    data = request.get_json() or {}
-    item = {
-        "title": data["title"],
-        "description": data.get("description",""),
-        "image_url": data.get("image_url",""),
-    "images": data.get("images", []),
-        "link_url": data.get("link_url",""),
-        "for_user": data.get("for_user"),
-        "added_by": str(u["_id"]),
-        "status": data.get("status","idea"),
-        "added_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = wishlist_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    # Push
-    try:
-        payload = {
-            'type': 'wishlist_created',
-            'title': 'Wishlist',
-            'body': f"Nouvel item: {item['title']}",
-            'url': '/wishlist'
-        }
-        broadcast_push(cid, u['email'], payload)
-    except Exception as e:
-        if DEBUG_PUSH:
-            print('[PUSH][WISHLIST][ERROR]', e)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/wishlist/<wid>")
-@jwt_required()
-@require_couple
-def wishlist_update(u, cid, wid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["title","description","image_url","link_url","for_user","status"]}
-    wishlist_col.update_one({"_id": oid(wid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/wishlist/<wid>")
-@jwt_required()
-@require_couple
-def wishlist_delete(u, cid, wid):
-    wishlist_col.delete_one({"_id": oid(wid), "couple_id": cid})
-    return {"msg":"deleted"}
-
-# ───────── Photos ─────────
-@app.get("/api/photos")
-@jwt_required()
-@require_couple
-def photos_list(u, cid):
-    items = list(photos_col.find({"couple_id": cid}).sort("uploaded_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.post("/api/photos")
-@jwt_required()
-@require_couple
-def photos_create(u, cid):
-    # Accept JSON (single) OR multipart (multi-files)
-    if request.content_type and 'multipart/form-data' in request.content_type:
-        files = request.files.getlist('files')
-        caption = request.form.get('caption','')
-        album_id = request.form.get('album_id') or None
-        created = []
-        for f in files:
-            try:
-                url = save_file(f)
-                item = {
-                    "url": url,
-                    "caption": caption,
-                    "album_id": album_id,
-                    "uploaded_by": str(u["_id"]),
-                    "uploaded_at": dt.datetime.utcnow(),
-                    "couple_id": cid
-                }
-                res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
-                created.append(serialize(item))
-            except Exception as e:
-                print('upload error', e)
-        return jsonify(created), 201
-    data = request.get_json() or {}
-    if not data.get('url'): return {"error":"missing_url"}, 400
-    item = {
-        "url": data["url"],
-        "caption": data.get("caption",""),
-        "album_id": data.get("album_id"),
-        "uploaded_by": str(u["_id"]),
-        "uploaded_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/photos/<pid>")
-@jwt_required()
-@require_couple
-def photos_update(u, cid, pid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["caption","album_id"]}
-    photos_col.update_one({"_id": oid(pid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/photos/<pid>")
-@jwt_required()
-@require_couple
-def photos_delete(u, cid, pid):
-    doc = photos_col.find_one({"_id": oid(pid), "couple_id": cid})
-    if not doc:
-        return {"error": "not_found"}, 404
-    # Remove DB record first
-    photos_col.delete_one({"_id": oid(pid), "couple_id": cid})
-    # Try delete physical file
-    try:
-        url = doc.get('url') or ''  # stored as /uploads/<name>
-        if url.startswith('/uploads/'):
-            fname = url.split('/uploads/',1)[1]
-            fpath = os.path.join(UPLOAD_DIR, fname)
-            if os.path.isfile(fpath):
-                os.remove(fpath)
-    except Exception as e:
-        print('file delete err', e)
-    return {"msg":"deleted"}
-
-# ───────── Notes ─────────
-@app.get("/api/notes")
-@jwt_required()
-@require_couple
-def notes_list(u, cid):
-    items = list(notes_col.find({"couple_id": cid}).sort("created_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.post("/api/notes")
-@jwt_required()
-@require_couple
-def notes_create(u, cid):
-    data = request.get_json() or {}
-    item = {
-        "content": data["content"],
-        "pinned": bool(data.get("pinned", False)),
-        "created_by": str(u["_id"]),
-        "created_at": dt.datetime.utcnow(),
-        "couple_id": cid
-    }
-    res = notes_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/notes/<nid>")
-@jwt_required()
-@require_couple
-def notes_update(u, cid, nid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["content","pinned"]}
-    notes_col.update_one({"_id": oid(nid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/notes/<nid>")
-@jwt_required()
-@require_couple
-def notes_delete(u, cid, nid):
-    notes_col.delete_one({"_id": oid(nid), "couple_id": cid})
-    return {"msg":"deleted"}
-
-# ───────── Upload (generic - no DB side effects) ─────────
-@app.post('/api/upload')
-@jwt_required()
-@require_couple
-def upload_files(u, cid):
-    """Generic file upload used by other feature forms (e.g., restaurants).
-    Returns just the stored file URLs under key 'files'.
-    (Photo library should use /api/photos for DB records.)"""
-    if 'files' not in request.files:
-        return {'error': 'no_files'}, 400
-    urls = []
-    for f in request.files.getlist('files'):
+# Middleware d'authentification
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.headers.get('Authorization')
+        if not token:
+            return jsonify({'message': 'Token manquant!'}), 401
+        
         try:
-            url = save_file(f)
-            urls.append(url)
-        except Exception as e:
-            print('upload err', e)
-    return {'files': urls}
+            if token.startswith('Bearer '):
+                token = token[7:]
+            data = jwt.decode(token, app.config['JWT_SECRET_KEY'], algorithms=["HS256"])
+            current_user_id = data['user_id']
+        except:
+            return jsonify({'message': 'Token invalide!'}), 401
+        
+        return f(current_user_id, *args, **kwargs)
+    return decorated
 
-@app.get('/uploads/<path:fname>')
-def serve_upload(fname):
-    return send_from_directory(UPLOAD_DIR, fname)
+# Helper function pour JSON
+def serialize_doc(doc):
+    if doc is None:
+        return None
+    doc['_id'] = str(doc['_id'])
+    return doc
 
-# ───────── Web Push (public key + subscribe + test) ─────────
-try:
-    from pywebpush import webpush, WebPushException  # type: ignore
-except Exception:
-    webpush = None
-    WebPushException = Exception
+# Routes d'authentification
+@app.route('/api/register', methods=['POST'])
+def register():
+    data = request.get_json()
+    
+    # Vérifier que l'utilisateur n'existe pas déjà
+    if mongo.db.users.find_one({'email': data['email']}):
+        return jsonify({'message': 'Email déjà utilisé'}), 400
+    
+    # Hasher le mot de passe
+    hashed_password = bcrypt.hashpw(data['password'].encode('utf-8'), bcrypt.gensalt())
+    
+    # Créer l'utilisateur
+    user = {
+        'name': data['name'],
+        'email': data['email'],
+        'password': hashed_password,
+        'avatar_url': data.get('avatar_url', ''),
+        'joined_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.users.insert_one(user)
+    
+    # Créer le token JWT
+    token = jwt.encode({
+        'user_id': str(result.inserted_id),
+        'exp': datetime.utcnow() + timedelta(days=30)
+    }, app.config['JWT_SECRET_KEY'])
+    
+    return jsonify({
+        'token': token,
+        'user': {
+            'id': str(result.inserted_id),
+            'name': user['name'],
+            'email': user['email'],
+            'avatar_url': user['avatar_url']
+        }
+    })
 
-VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
-VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
-VAPID_SUBJECT     = os.getenv("VAPID_SUBJECT", "mailto:admin@example.com")
-DEBUG_PUSH        = os.getenv("DEBUG_PUSH", "0") in ("1","true","True")
+@app.route('/api/login', methods=['POST'])
+def login():
+    data = request.get_json()
+    
+    user = mongo.db.users.find_one({'email': data['email']})
+    
+    if user and bcrypt.checkpw(data['password'].encode('utf-8'), user['password']):
+        token = jwt.encode({
+            'user_id': str(user['_id']),
+            'exp': datetime.utcnow() + timedelta(days=30)
+        }, app.config['JWT_SECRET_KEY'])
+        
+        return jsonify({
+            'token': token,
+            'user': {
+                'id': str(user['_id']),
+                'name': user['name'],
+                'email': user['email'],
+                'avatar_url': user.get('avatar_url', '')
+            }
+        })
+    
+    return jsonify({'message': 'Email ou mot de passe incorrect'}), 401
 
-def send_push(subscription, payload: dict):
-    if not (webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY):
-        return False, 'missing_webpush_or_keys'
-    try:
-        data_str = jsonify(payload).get_data(as_text=True)
-        if DEBUG_PUSH:
-            print('[PUSH][SEND]', subscription.get('endpoint','')[:55], payload.get('title'))
-        webpush(
-            subscription_info=subscription,
-            data=data_str,
-            vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_public_key=VAPID_PUBLIC_KEY,
-            vapid_claims={"sub": VAPID_SUBJECT}
-        )
-        return True, None
-    except WebPushException as ex:  # pragma: no cover
-        if DEBUG_PUSH:
-            print('[PUSH][ERROR]', ex)
-        return False, str(ex)
+# Route pour récupérer les utilisateurs du couple
+@app.route('/api/users', methods=['GET'])
+@token_required
+def get_users(current_user_id):
+    users = list(mongo.db.users.find({}, {'password': 0}).sort('joined_at', 1))
+    return jsonify([serialize_doc(user) for user in users])
 
-@app.get('/api/push/public-key')
-def push_public_key():
-    return {"publicKey": VAPID_PUBLIC_KEY}
+# Routes pour les rappels
+@app.route('/api/reminders', methods=['GET'])
+@token_required
+def get_reminders(current_user_id):
+    # Récupérer TOUS les rappels (partage couple)
+    reminders = list(mongo.db.reminders.find().sort('created_at', -1))
+    
+    # Enrichir avec les infos utilisateur
+    for reminder in reminders:
+        if reminder.get('created_by'):
+            creator = mongo.db.users.find_one({'_id': ObjectId(reminder['created_by'])})
+            reminder['created_by_name'] = creator['name'] if creator else 'Inconnu'
+        if reminder.get('assigned_to'):
+            assignee = mongo.db.users.find_one({'_id': ObjectId(reminder['assigned_to'])})
+            reminder['assigned_to_name'] = assignee['name'] if assignee else 'Inconnu'
+    
+    return jsonify([serialize_doc(reminder) for reminder in reminders])
 
-@app.post('/api/push/subscribe')
-@jwt_required()
-def push_subscribe():
-    data = request.get_json() or {}
-    if 'endpoint' not in data or 'keys' not in data:
-        return {"error":"invalid_subscription"}, 400
-    u = current_user()
-    if not u: return {"error":"unauth"}, 401
-    push_subs_col.update_one(
-        {"user_email": u['email'], "endpoint": data['endpoint']},
-        {"$set": {"user_email": u['email'], "endpoint": data['endpoint'], "subscription": data, "updated_at": dt.datetime.utcnow(), "couple_id": u.get('couple_id')}},
-        upsert=True
+@app.route('/api/reminders', methods=['POST'])
+@token_required
+def create_reminder(current_user_id):
+    data = request.get_json()
+    
+    reminder = {
+        'title': data['title'],
+        'description': data.get('description', ''),
+        'created_by': current_user_id,
+        'assigned_to': data.get('assigned_to'),
+        'priority': data.get('priority', 'normal'),
+        'due_date': datetime.fromisoformat(data['due_date']) if data.get('due_date') else None,
+        'status': 'pending',
+        'created_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.reminders.insert_one(reminder)
+    reminder['_id'] = str(result.inserted_id)
+    
+    return jsonify(serialize_doc(reminder)), 201
+
+@app.route('/api/reminders/<reminder_id>', methods=['PUT'])
+@token_required
+def update_reminder(current_user_id, reminder_id):
+    data = request.get_json()
+    
+    update_data = {}
+    if 'status' in data:
+        update_data['status'] = data['status']
+    if 'title' in data:
+        update_data['title'] = data['title']
+    if 'description' in data:
+        update_data['description'] = data['description']
+    
+    mongo.db.reminders.update_one(
+        {'_id': ObjectId(reminder_id)},
+        {'$set': update_data}
     )
-    return {"ok": True}, 201
+    
+    return jsonify({'message': 'Rappel mis à jour'})
 
-@app.post('/api/push/test')
-@jwt_required()
-def push_test():
-    u = current_user()
-    if not u: return {"error":"unauth"}, 401
-    sub = push_subs_col.find_one({"user_email": u['email']})
-    if not sub:
-        return {"error":"no_subscription"}, 404
-    payload = {"type":"test","title":"Test Push","body":"Ça marche !"}
-    ok, err = send_push(sub['subscription'], payload)
-    if not ok:
-        return {"error":"send_failed","detail": err}, 500
-    return {"sent": True}
+# Routes pour les restaurants
+@app.route('/api/restaurants', methods=['GET'])
+@token_required
+def get_restaurants(current_user_id):
+    restaurants = list(mongo.db.restaurants.find().sort('added_at', -1))
+    return jsonify([serialize_doc(restaurant) for restaurant in restaurants])
 
-# ---- Hook push helpers ----
-def broadcast_push(couple_id, author_email, payload: dict, exclude_author=True):
-    if not (webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY):
-        return
-    query = {"couple_id": couple_id}
-    subs = list(push_subs_col.find(query))
-    for s in subs:
-        if exclude_author and s.get('user_email') == author_email:
-            continue
-        ok, err = send_push(s.get('subscription', {}), payload)
-        if not ok and err and ('410' in err or 'expired' in err.lower()):
-            push_subs_col.delete_one({'_id': s['_id']})
+@app.route('/api/restaurants', methods=['POST'])
+@token_required
+def create_restaurant(current_user_id):
+    data = request.get_json()
+    
+    restaurant = {
+        'name': data['name'],
+        'address': data.get('address', ''),
+        'map_url': data.get('map_url', ''),
+        'image_url': data.get('image_url', ''),
+        'status': data.get('status', 'to_try'),
+        'notes': data.get('notes', ''),
+        'added_by': current_user_id,
+        'added_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.restaurants.insert_one(restaurant)
+    restaurant['_id'] = str(result.inserted_id)
+    
+    return jsonify(serialize_doc(restaurant)), 201
 
-# ───────── Entrypoint ─────────
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
+# Routes pour les activités
+@app.route('/api/activities', methods=['GET'])
+@token_required
+def get_activities(current_user_id):
+    activities = list(mongo.db.activities.find().sort('added_at', -1))
+    return jsonify([serialize_doc(activity) for activity in activities])
+
+@app.route('/api/activities', methods=['POST'])
+@token_required
+def create_activity(current_user_id):
+    data = request.get_json()
+    
+    activity = {
+        'title': data['title'],
+        'category': data.get('category', 'other'),
+        'status': data.get('status', 'planned'),
+        'notes': data.get('notes', ''),
+        'image_url': data.get('image_url', ''),
+        'added_by': current_user_id,
+        'added_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.activities.insert_one(activity)
+    activity['_id'] = str(result.inserted_id)
+    
+    return jsonify(serialize_doc(activity)), 201
+
+# Routes pour la wishlist
+@app.route('/api/wishlist', methods=['GET'])
+@token_required
+def get_wishlist(current_user_id):
+    # Récupérer les couples de l'utilisateur
+    user_couples = list(mongo.db.couples.find({'users': current_user_id}))
+    couple_ids = [str(couple['_id']) for couple in user_couples]
+    
+    # Récupérer wishlist pour utilisateur et ses couples
+    query = {
+        '$or': [
+            {'added_by': current_user_id},
+            {'recipient_id': {'$in': couple_ids}},
+            {'recipient_id': current_user_id}
+        ]
+    }
+    
+    wishlist = list(mongo.db.wishlist_items.find(query).sort('added_at', -1))
+    
+    # Enrichir avec les données d'images
+    for item in wishlist:
+        if 'images' in item and item['images']:
+            images_data = []
+            for img_id in item['images']:
+                if isinstance(img_id, str):
+                    img_doc = mongo.db.photos.find_one({'_id': ObjectId(img_id)})
+                    if img_doc:
+                        images_data.append(serialize_doc(img_doc))
+                elif isinstance(img_id, ObjectId):
+                    img_doc = mongo.db.photos.find_one({'_id': img_id})
+                    if img_doc:
+                        images_data.append(serialize_doc(img_doc))
+            item['images'] = images_data
+    
+    return jsonify([serialize_doc(item) for item in wishlist])
+
+@app.route('/api/wishlist', methods=['POST'])
+@token_required
+def create_wishlist_item(current_user_id):
+    data = request.get_json()
+    
+    item = {
+        'title': data['title'],
+        'description': data.get('description', ''),
+        'image_url': data.get('image_url', ''),
+        'link_url': data.get('link_url', ''),
+        'recipient_id': data.get('recipient_id', ''),
+        'added_by': current_user_id,
+        'status': data.get('status', 'idea'),
+        'images': data.get('images', []),
+        'added_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.wishlist_items.insert_one(item)
+    item['_id'] = str(result.inserted_id)
+    
+    # Broadcast push notification (excluding author)
+    try:
+        from utils.push_utils import broadcast_push
+        broadcast_push(
+            title="Nouvel élément wishlist",
+            body=f"'{item['title']}' a été ajouté à la wishlist",
+            exclude_user=current_user_id
+        )
+    except Exception as e:
+        print(f"Erreur push notification: {e}")
+    
+    return jsonify(serialize_doc(item)), 201
+
+# Routes pour les couples
+@app.route('/api/couples', methods=['GET'])
+@token_required
+def get_couples(current_user_id):
+    couples = list(mongo.db.couples.find({'users': current_user_id}))
+    return jsonify([serialize_doc(couple) for couple in couples])
+
+# Routes pour les photos
+@app.route('/api/photos', methods=['GET'])
+@token_required
+def get_photos(current_user_id):
+    photos = list(mongo.db.photos.find().sort('uploaded_at', -1))
+    return jsonify([serialize_doc(photo) for photo in photos])
+
+@app.route('/api/photos', methods=['POST'])
+@token_required
+def create_photo(current_user_id):
+    data = request.get_json()
+    
+    photo = {
+        'url': data['url'],
+        'caption': data.get('caption', ''),
+        'album_id': data.get('album_id'),
+        'uploaded_by': current_user_id,
+        'uploaded_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.photos.insert_one(photo)
+    photo['_id'] = str(result.inserted_id)
+    
+    return jsonify(serialize_doc(photo)), 201
+
+# Routes pour les notes
+@app.route('/api/notes', methods=['GET'])
+@token_required
+def get_notes(current_user_id):
+    notes = list(mongo.db.notes.find().sort('created_at', -1))
+    return jsonify([serialize_doc(note) for note in notes])
+
+@app.route('/api/notes', methods=['POST'])
+@token_required
+def create_note(current_user_id):
+    data = request.get_json()
+    
+    note = {
+        'content': data['content'],
+        'pinned': data.get('pinned', False),
+        'created_by': current_user_id,
+        'created_at': datetime.utcnow()
+    }
+    
+    result = mongo.db.notes.insert_one(note)
+    note['_id'] = str(result.inserted_id)
+    
+    return jsonify(serialize_doc(note)), 201
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
