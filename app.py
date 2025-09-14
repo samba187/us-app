@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
+import re
 from flask_pymongo import PyMongo
 from bson import ObjectId
 from datetime import datetime, timedelta
@@ -14,14 +15,33 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# CORS dynamique : lit CORS_ORIGINS (séparé par des virgules) sinon autorise frontend Netlify courant
-raw_origins = os.getenv('CORS_ORIGINS')
-if raw_origins:
-    origins = [o.strip() for o in raw_origins.split(',') if o.strip()]
-else:
-    origins = ["http://localhost:3000"]
+# --- CORS avancé inspiré ancienne version ---
+# Fallback origins inclut nouveau domaine Netlify + localhost
+_fallback_origins = "https://dreamy-kitten-9d113d.netlify.app,http://localhost:3000"
+raw_origins = os.getenv("CORS_ORIGINS", _fallback_origins)
+origins_list = [o.strip() for o in raw_origins.split(',') if o.strip()]
 
-CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
+# Optionnel: autoriser prévisualisations Netlify si variable set
+if os.getenv("ALLOW_NETLIFY_PREVIEWS", "false").lower() in ("1", "true", "yes"):
+    # Flask-CORS accepte des objets regex dans origins si fournis directement
+    origins_list.append(re.compile(r"^https://.*\.netlify\.app$"))
+
+CORS(
+    app,
+    resources={r"/api/*": {
+        "origins": origins_list,
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+        "supports_credentials": False
+    }},
+    vary_header=True,
+    intercept_exceptions=True,
+    always_send=True
+)
+
+@app.route('/api/<path:_any>', methods=['OPTIONS'])
+def cors_preflight(_any):
+    return ('', 204)
 
 # Configuration MongoDB
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
