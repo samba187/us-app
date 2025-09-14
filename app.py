@@ -13,7 +13,18 @@ from functools import wraps
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app)
+
+# Configuration CORS étendue pour autoriser frontend Netlify
+CORS(app, 
+     origins=[
+         "http://localhost:3000",
+         "https://dreamy-kitten-9d113d.netlify.app",
+         "https://*.netlify.app"
+     ],
+     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+     allow_headers=['Content-Type', 'Authorization'],
+     supports_credentials=True
+)
 
 # Configuration MongoDB
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
@@ -289,12 +300,8 @@ def create_wishlist_item(current_user_id):
     
     # Broadcast push notification (excluding author)
     try:
-        from utils.push_utils import broadcast_push
-        broadcast_push(
-            title="Nouvel élément wishlist",
-            body=f"'{item['title']}' a été ajouté à la wishlist",
-            exclude_user=current_user_id
-        )
+        # TODO: Implémenter broadcast_push quand nécessaire
+        print(f"Push notification: Nouvel élément wishlist '{item['title']}'")
     except Exception as e:
         print(f"Erreur push notification: {e}")
     
