@@ -83,6 +83,11 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && user) {
       crossNotificationService.startCrossNotifications();
+      // S'assurer qu'après un simple refresh (user déjà loggé) on (re)fait l'inscription push
+      // (évite de dépendre uniquement de handleLogin)
+      setTimeout(() => {
+        try { registerPush(); } catch(e) { console.log('[Push] auto register error', e); }
+      }, 1200);
       
       // Arrêter les notifications lors de la déconnexion
       return () => {
@@ -97,7 +102,7 @@ function App() {
     setIsAuthenticated(true);
     setUser(userData);
     // Essayer d'enregistrer le push après un petit délai (permission Notification peut venir plus tard)
-    setTimeout(() => { registerPush(); }, 1500);
+    setTimeout(() => { registerPush(); }, 800);
   };
 
   const handleLogout = () => {

@@ -1,9 +1,10 @@
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
 from flask_pymongo import PyMongo
 from bson import ObjectId
 from datetime import datetime, timedelta
 import os
+import uuid
 from dotenv import load_dotenv
 import bcrypt
 import jwt
@@ -11,11 +12,19 @@ import secrets
 import string
 from pywebpush import webpush, WebPushException
 from functools import wraps
+from werkzeug.utils import secure_filename
 
 # Charger les variables d'environnement
 load_dotenv()
 
 app = Flask(__name__)
+
+# Dossier d'upload simple (stockage local)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOAD_DIR = os.path.join(os.path.dirname(BASE_DIR), 'uploads')  # remonte d'un niveau pour partager avec projet root
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+app.config['UPLOAD_FOLDER'] = UPLOAD_DIR
+ALLOWED_IMAGE_EXT = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
 
 # CORS solide: autorise toutes origines pour l'API, sans credentials
 CORS(app,
@@ -42,8 +51,15 @@ def handle_preflight():
         resp.headers['Access-Control-Allow-Methods'] = 'GET,PUT,POST,DELETE,OPTIONS'
         return resp
 
-# Configuration MongoDB / JWT
-app.config["MONGO_URI"] = os.getenv("MONGO_URI")
+# Configuration MongoDB / JWT (fallback multi noms)
+_mongo_uri = (
+    os.getenv("MONGO_URI") or
+    os.getenv("MONGODB_URI") or
+    os.getenv("MONGO_URI_ATLAS") or
+    os.getenv("MONGODB_ATLAS_URI")
+)
+app.config["MONGO_URI"] = _mongo_uri
+app.config['DEBUG_PUSH'] = os.getenv('DEBUG_PUSH', '0') == '1'
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "change-me")
 app.config["VAPID_PUBLIC_KEY"] = os.getenv("VAPID_PUBLIC_KEY", "")
 app.config["VAPID_PRIVATE_KEY"] = os.getenv("VAPID_PRIVATE_KEY", "")
@@ -81,6 +97,8 @@ def send_push(subscription, payload):
     if not app.config['VAPID_PUBLIC_KEY'] or not app.config['VAPID_PRIVATE_KEY']:
         return False, 'VAPID keys missing'
     try:
+        if app.config['DEBUG_PUSH']:
+            print('[PUSH][SEND] endpoint=', subscription.get('endpoint','')[:60], 'payload=', payload[:120])
         webpush(
             subscription_info=subscription,
             data=payload,
@@ -90,6 +108,8 @@ def send_push(subscription, payload):
         )
         return True, None
     except WebPushException as ex:
+        if app.config['DEBUG_PUSH']:
+            print('[PUSH][ERROR]', ex)
         return False, str(ex)
 
 # Routes d'authentification
@@ -316,6 +336,7 @@ def create_wishlist_item(current_user_id):
         'title': data['title'],
         'description': data.get('description', ''),
         'image_url': data.get('image_url', ''),
+        'images': data.get('images', []),
         'link_url': data.get('link_url', ''),
         'for_user': data.get('for_user'),
         'added_by': current_user_id,
@@ -343,6 +364,20 @@ def create_wishlist_item(current_user_id):
         pass
     return jsonify(serialize_doc(item)), 201
 
+@app.route('/api/wishlist/<item_id>', methods=['PUT'])
+@token_required
+def update_wishlist_item(current_user_id, item_id):
+    data = request.get_json()
+    update = {}
+    for field in ['title', 'description', 'image_url', 'link_url', 'status', 'for_user', 'images']:
+        if field in data:
+            update[field] = data[field]
+    if not update:
+        return jsonify({'message': 'Rien à mettre à jour'}), 400
+    mongo.db.wishlist_items.update_one({'_id': ObjectId(item_id)}, {'$set': update})
+    doc = mongo.db.wishlist_items.find_one({'_id': ObjectId(item_id)})
+    return jsonify(serialize_doc(doc)), 200
+
 # Routes pour les photos
 @app.route('/api/photos', methods=['GET'])
 @token_required
@@ -353,8 +388,33 @@ def get_photos(current_user_id):
 @app.route('/api/photos', methods=['POST'])
 @token_required
 def create_photo(current_user_id):
+    # Support JSON (ancien) OU multipart (nouvel upload d'images)
+    if request.content_type and request.content_type.startswith('multipart/form-data'):
+        files = request.files.getlist('files')
+        saved = []
+        for f in files:
+            filename = secure_filename(f.filename)
+            if not filename:
+                continue
+            ext = os.path.splitext(filename)[1].lower()
+            if ext not in ALLOWED_IMAGE_EXT:
+                continue
+            new_name = f"{uuid.uuid4().hex}{ext}"
+            path = os.path.join(UPLOAD_DIR, new_name)
+            f.save(path)
+            doc = {
+                'url': f'/uploads/{new_name}',
+                'caption': '',
+                'album_id': None,
+                'uploaded_by': current_user_id,
+                'uploaded_at': datetime.utcnow()
+            }
+            result = mongo.db.photos.insert_one(doc)
+            doc['_id'] = str(result.inserted_id)
+            saved.append(doc)
+        return jsonify(saved), 201
+    # JSON classique
     data = request.get_json()
-    
     photo = {
         'url': data['url'],
         'caption': data.get('caption', ''),
@@ -362,10 +422,8 @@ def create_photo(current_user_id):
         'uploaded_by': current_user_id,
         'uploaded_at': datetime.utcnow()
     }
-    
     result = mongo.db.photos.insert_one(photo)
     photo['_id'] = str(result.inserted_id)
-    
     return jsonify(serialize_doc(photo)), 201
 
 # Routes pour les notes
@@ -397,6 +455,11 @@ def create_note(current_user_id):
 def get_public_key():
     return jsonify({'publicKey': app.config['VAPID_PUBLIC_KEY']}), 200
 
+@app.route('/uploads/<path:filename>', methods=['GET'])
+def serve_upload(filename):
+    # Sécurité: ne pas permettre de remonter dans l'arborescence
+    return send_from_directory(UPLOAD_DIR, filename, as_attachment=False)
+
 @app.route('/api/push/subscribe', methods=['POST'])
 @token_required
 def subscribe_push(current_user_id):
@@ -404,6 +467,8 @@ def subscribe_push(current_user_id):
     if 'endpoint' not in data or 'keys' not in data:
         return jsonify({'message': 'Invalid subscription'}), 400
     # Upsert par user + endpoint
+    if app.config['DEBUG_PUSH']:
+        print('[PUSH][SUBSCRIBE] user', current_user_id, 'endpoint', data.get('endpoint','')[:60])
     mongo.db.push_subscriptions.update_one(
         {'user_id': current_user_id, 'endpoint': data['endpoint']},
         {'$set': {'user_id': current_user_id, 'endpoint': data['endpoint'], 'subscription': data, 'updated_at': datetime.utcnow()}},
@@ -426,3 +491,19 @@ def test_push(current_user_id):
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+# ---- HEALTH ----
+@app.route('/api/health', methods=['GET'])
+def health():
+    db_ok = True
+    try:
+        mongo.db.command('ping')
+    except Exception as e:
+        db_ok = False
+    return jsonify({
+        'status': 'ok',
+        'db': db_ok,
+        'vapid_public_set': bool(app.config['VAPID_PUBLIC_KEY']),
+        'push_subscriptions': mongo.db.push_subscriptions.count_documents({}),
+        'debug_push': app.config['DEBUG_PUSH']
+    }), 200

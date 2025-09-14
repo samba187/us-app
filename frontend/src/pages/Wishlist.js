@@ -274,6 +274,80 @@ const FileInput = styled.input`
   }
 `;
 
+const ImageCount = styled.div`
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+`;
+
+const ImageGallery = styled.div`
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  z-index: 10000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+`;
+
+const GalleryHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  max-width: 500px;
+  margin-bottom: 20px;
+  color: white;
+`;
+
+const CloseButton = styled.button`
+  background: none;
+  border: none;
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px;
+`;
+
+const GalleryImage = styled.img`
+  max-width: 90vw;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 8px;
+`;
+
+const ImageNav = styled.div`
+  display: flex;
+  gap: 20px;
+  margin-top: 20px;
+`;
+
+const NavButton = styled.button`
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+`;
+
 const FormButtons = styled.div`
   display: flex;
   gap: 10px;
@@ -304,6 +378,8 @@ function Wishlist() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
+  const [viewingImages, setViewingImages] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -337,21 +413,23 @@ function Wishlist() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      let imageUrl = '';
+      let imageUrls = [];
       
-      // Upload de l'image si présente
+      // Upload de toutes les images sélectionnées
       if (formData.files && formData.files.length > 0) {
-        const uploadData = new FormData();
-        uploadData.append('files', formData.files[0]); // Prendre la première image
-        uploadData.append('category', 'wishlist');
-        
         try {
-          const uploadResult = await photoService.uploadMultipart(uploadData);
-          if (uploadResult && uploadResult.length > 0) {
-            imageUrl = uploadResult[0].path; // Utiliser le path de l'image uploadée
+          for (let i = 0; i < formData.files.length; i++) {
+            const uploadData = new FormData();
+            uploadData.append('files', formData.files[i]);
+            uploadData.append('category', 'wishlist');
+            
+            const uploadResult = await photoService.uploadMultipart(uploadData);
+            if (uploadResult && uploadResult.length > 0) {
+              imageUrls.push(uploadResult[0].path);
+            }
           }
         } catch (uploadError) {
-          console.error('Erreur upload image:', uploadError);
+          console.error('Erreur upload images:', uploadError);
         }
       }
 
@@ -359,7 +437,8 @@ function Wishlist() {
         title: formData.title,
         description: formData.description,
         link_url: formData.link_url,
-        image_url: imageUrl || editingItem?.image_url || ''
+        image_url: imageUrls.length > 0 ? imageUrls[0] : (editingItem?.image_url || ''), // Image principale pour l'affichage
+        images: imageUrls.length > 0 ? imageUrls : (editingItem?.images || []) // Tableau de toutes les images
       };
 
       if (editingItem) {
@@ -451,13 +530,25 @@ function Wishlist() {
 
       {wishlist.map((item) => (
         <WishlistCard key={item._id}>
-          <WishlistImage image={item.image_url}>
+          <WishlistImage 
+            image={item.image_url} 
+            onClick={() => {
+              if (item.images && item.images.length > 1) {
+                setCurrentImageIndex(0);
+                setViewingImages(item);
+              }
+            }}
+            style={{ cursor: item.images && item.images.length > 1 ? 'pointer' : 'default' }}
+          >
             {!item.image_url && (
               <WishlistIcon>🎁</WishlistIcon>
             )}
             <StatusBadge status={item.status}>
               {getStatusLabel(item.status)}
             </StatusBadge>
+            {item.images && item.images.length > 1 && (
+              <ImageCount>📷 {item.images.length}</ImageCount>
+            )}
           </WishlistImage>
           
           <WishlistContent>
@@ -560,6 +651,52 @@ function Wishlist() {
           </Form>
         </ModalContent>
       </Modal>
+
+      {/* Galerie d'images */}
+      {viewingImages && (
+        <ImageGallery onClick={() => setViewingImages(null)}>
+          <GalleryHeader>
+            <h3>{viewingImages.title}</h3>
+            <CloseButton onClick={() => setViewingImages(null)}>×</CloseButton>
+          </GalleryHeader>
+          
+          {viewingImages.images && viewingImages.images.length > 0 && (
+            <div style={{ textAlign: 'center' }}>
+              <GalleryImage 
+                src={viewingImages.images[currentImageIndex] || viewingImages.image_url} 
+                alt={viewingImages.title}
+                onClick={(e) => e.stopPropagation()}
+              />
+              
+              {viewingImages.images.length > 1 && (
+                <ImageNav>
+                  <NavButton 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentImageIndex(prev => prev > 0 ? prev - 1 : viewingImages.images.length - 1);
+                    }}
+                  >
+                    ‹ Précédent
+                  </NavButton>
+                  
+                  <span style={{ color: 'white', alignSelf: 'center' }}>
+                    {currentImageIndex + 1} / {viewingImages.images.length}
+                  </span>
+                  
+                  <NavButton 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCurrentImageIndex(prev => prev < viewingImages.images.length - 1 ? prev + 1 : 0);
+                    }}
+                  >
+                    Suivant ›
+                  </NavButton>
+                </ImageNav>
+              )}
+            </div>
+          )}
+        </ImageGallery>
+      )}
     </WishlistContainer>
   );
 }
