@@ -38,6 +38,7 @@ activities_col  = db["activities"]
 wishlist_col    = db["wishlist_items"]
 photos_col      = db["photos"]
 notes_col       = db["notes"]
+push_subs_col   = db["push_subscriptions"]
 
 # CORS (laisser flask-cors gérer, pas d'after_request)
 origins = [o.strip() for o in os.getenv(
@@ -104,7 +105,7 @@ def ensure_indexes():
         users_col.create_index("couple_id")
         couples_col.create_index("invite_code", unique=True)
 
-        for col in (reminders_col, restaurants_col, activities_col, wishlist_col, photos_col, notes_col):
+        for col in (reminders_col, restaurants_col, activities_col, wishlist_col, photos_col, notes_col, push_subs_col):
             col.create_index("couple_id")
             for fld in ("created_at","added_at","uploaded_at"):
                 try: col.create_index([(fld, -1)])
@@ -269,6 +270,18 @@ def reminders_create(u, cid):
         "couple_id": cid
     }
     res = reminders_col.insert_one(item); item["_id"]=str(res.inserted_id)
+    # Push
+    try:
+        payload = {
+            'type': 'reminder_created',
+            'title': 'Nouveau rappel',
+            'body': f"{item['title']} (prio: {item['priority']})",
+            'url': '/reminders'
+        }
+        broadcast_push(cid, u['email'], payload)
+    except Exception as e:
+        if DEBUG_PUSH:
+            print('[PUSH][REMINDER][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/reminders/<rid>")
@@ -418,6 +431,18 @@ def wishlist_create(u, cid):
         "couple_id": cid
     }
     res = wishlist_col.insert_one(item); item["_id"]=str(res.inserted_id)
+    # Push
+    try:
+        payload = {
+            'type': 'wishlist_created',
+            'title': 'Wishlist',
+            'body': f"Nouvel item: {item['title']}",
+            'url': '/wishlist'
+        }
+        broadcast_push(cid, u['email'], payload)
+    except Exception as e:
+        if DEBUG_PUSH:
+            print('[PUSH][WISHLIST][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/wishlist/<wid>")
@@ -574,6 +599,84 @@ def upload_files(u, cid):
 @app.get('/uploads/<path:fname>')
 def serve_upload(fname):
     return send_from_directory(UPLOAD_DIR, fname)
+
+# ───────── Web Push (public key + subscribe + test) ─────────
+try:
+    from pywebpush import webpush, WebPushException  # type: ignore
+except Exception:
+    webpush = None
+    WebPushException = Exception
+
+VAPID_PUBLIC_KEY  = os.getenv("VAPID_PUBLIC_KEY", "")
+VAPID_PRIVATE_KEY = os.getenv("VAPID_PRIVATE_KEY", "")
+VAPID_SUBJECT     = os.getenv("VAPID_SUBJECT", "mailto:admin@example.com")
+DEBUG_PUSH        = os.getenv("DEBUG_PUSH", "0") in ("1","true","True")
+
+def send_push(subscription, payload: dict):
+    if not (webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY):
+        return False, 'missing_webpush_or_keys'
+    try:
+        data_str = jsonify(payload).get_data(as_text=True)
+        if DEBUG_PUSH:
+            print('[PUSH][SEND]', subscription.get('endpoint','')[:55], payload.get('title'))
+        webpush(
+            subscription_info=subscription,
+            data=data_str,
+            vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_public_key=VAPID_PUBLIC_KEY,
+            vapid_claims={"sub": VAPID_SUBJECT}
+        )
+        return True, None
+    except WebPushException as ex:  # pragma: no cover
+        if DEBUG_PUSH:
+            print('[PUSH][ERROR]', ex)
+        return False, str(ex)
+
+@app.get('/api/push/public-key')
+def push_public_key():
+    return {"publicKey": VAPID_PUBLIC_KEY}
+
+@app.post('/api/push/subscribe')
+@jwt_required()
+def push_subscribe():
+    data = request.get_json() or {}
+    if 'endpoint' not in data or 'keys' not in data:
+        return {"error":"invalid_subscription"}, 400
+    u = current_user()
+    if not u: return {"error":"unauth"}, 401
+    push_subs_col.update_one(
+        {"user_email": u['email'], "endpoint": data['endpoint']},
+        {"$set": {"user_email": u['email'], "endpoint": data['endpoint'], "subscription": data, "updated_at": dt.datetime.utcnow(), "couple_id": u.get('couple_id')}},
+        upsert=True
+    )
+    return {"ok": True}, 201
+
+@app.post('/api/push/test')
+@jwt_required()
+def push_test():
+    u = current_user()
+    if not u: return {"error":"unauth"}, 401
+    sub = push_subs_col.find_one({"user_email": u['email']})
+    if not sub:
+        return {"error":"no_subscription"}, 404
+    payload = {"type":"test","title":"Test Push","body":"Ça marche !"}
+    ok, err = send_push(sub['subscription'], payload)
+    if not ok:
+        return {"error":"send_failed","detail": err}, 500
+    return {"sent": True}
+
+# ---- Hook push helpers ----
+def broadcast_push(couple_id, author_email, payload: dict, exclude_author=True):
+    if not (webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY):
+        return
+    query = {"couple_id": couple_id}
+    subs = list(push_subs_col.find(query))
+    for s in subs:
+        if exclude_author and s.get('user_email') == author_email:
+            continue
+        ok, err = send_push(s.get('subscription', {}), payload)
+        if not ok and err and ('410' in err or 'expired' in err.lower()):
+            push_subs_col.delete_one({'_id': s['_id']})
 
 # ───────── Entrypoint ─────────
 if __name__ == "__main__":
