@@ -14,14 +14,25 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration CORS simple - utilise CORS_ORIGINS depuis Heroku config vars
-CORS(app)
+# CORS dynamique : lit CORS_ORIGINS (séparé par des virgules) sinon autorise frontend Netlify courant
+raw_origins = os.getenv('CORS_ORIGINS')
+if raw_origins:
+    origins = [o.strip() for o in raw_origins.split(',') if o.strip()]
+else:
+    origins = ["http://localhost:3000"]
+
+CORS(app, resources={r"/api/*": {"origins": origins}}, supports_credentials=True)
 
 # Configuration MongoDB
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "your-secret-key-here")
 
 mongo = PyMongo(app)
+
+# Collections helpers
+users_col = lambda: mongo.db.users
+couples_col = lambda: mongo.db.couples
+push_subs_col = lambda: mongo.db.push_subscriptions
 
 # Middleware d'authentification
 def token_required(f):
@@ -48,6 +59,25 @@ def serialize_doc(doc):
         return None
     doc['_id'] = str(doc['_id'])
     return doc
+
+def serialize_many(cursor):
+    return [serialize_doc(d) for d in cursor]
+
+# -------------------- HEALTH --------------------
+@app.route('/api/health', methods=['GET'])
+def health():
+    return jsonify({
+        'status': 'ok',
+        'version': os.getenv('COMMIT_SHA', 'dev'),
+        'origins': raw_origins or ''
+    })
+
+# -------------------- USER / COUPLE INFO --------------------
+@app.route('/api/couple/me', methods=['GET'])
+@token_required
+def couple_me(current_user_id):
+    couple = couples_col().find_one({'users': current_user_id})
+    return jsonify(serialize_doc(couple) if couple else None)
 
 # Routes d'authentification
 @app.route('/api/register', methods=['POST'])
@@ -304,6 +334,37 @@ def create_wishlist_item(current_user_id):
 def get_couples(current_user_id):
     couples = list(mongo.db.couples.find({'users': current_user_id}))
     return jsonify([serialize_doc(couple) for couple in couples])
+
+# -------------------- PUSH NOTIFICATIONS --------------------
+@app.route('/api/push/public-key', methods=['GET'])
+def push_public_key():
+    public_key = os.getenv('VAPID_PUBLIC_KEY')
+    if not public_key:
+        return jsonify({'error': 'VAPID public key missing'}), 404
+    return jsonify({'publicKey': public_key})
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@token_required
+def push_subscribe(current_user_id):
+    data = request.get_json() or {}
+    endpoint = data.get('endpoint')
+    if not endpoint:
+        return jsonify({'error': 'Missing endpoint'}), 400
+    sub = {
+        'user_id': current_user_id,
+        'endpoint': endpoint,
+        'keys': data.get('keys', {}),
+        'created_at': datetime.utcnow()
+    }
+    push_subs_col().update_one({'endpoint': endpoint}, {'$set': sub}, upsert=True)
+    return jsonify({'status': 'subscribed'})
+
+@app.route('/api/push/test', methods=['POST'])
+@token_required
+def push_test(current_user_id):
+    # Placeholder simple (sans pywebpush si non installé)
+    count = push_subs_col().count_documents({'user_id': current_user_id})
+    return jsonify({'message': 'Test push simulé', 'subscriptions': count})
 
 # Routes pour les photos
 @app.route('/api/photos', methods=['GET'])
