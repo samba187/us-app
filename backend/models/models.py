@@ -88,16 +88,17 @@ class Activity(BaseModel):
         self.added_at = datetime.utcnow()
 
 class WishlistItem(BaseModel):
-    """Modèle élément wishlist"""
+    """Modèle élément wishlist (support multi-images)"""
     
     STATUSES = ['idea', 'bought', 'gifted']
     
     def __init__(self, title, for_user, added_by, description='', image_url='', 
-                 link_url='', status='idea', **kwargs):
+                 link_url='', images=None, status='idea', **kwargs):
         super().__init__(**kwargs)
         self.title = title
         self.description = description
-        self.image_url = image_url
+        self.image_url = image_url  # image principale / cover
+        self.images = images or []  # liste d'URLs supplémentaires
         self.link_url = link_url
         self.for_user = for_user
         self.added_by = added_by
