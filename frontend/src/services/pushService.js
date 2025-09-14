@@ -4,9 +4,28 @@
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 async function getPublicKey() {
-  const res = await fetch(`${API_BASE_URL}/push/public-key`);
-  const data = await res.json();
-  return data.publicKey;
+  try {
+    const res = await fetch(`${API_BASE_URL}/push/public-key`, { method: 'GET' });
+    if (!res.ok) {
+      console.log('[Push] public-key HTTP error', res.status, res.statusText);
+      return null;
+    }
+    const contentType = res.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      const text = await res.text();
+      console.log('[Push] public-key non JSON response snippet:', text.slice(0, 120));
+      return null;
+    }
+    const data = await res.json();
+    if (!data || !data.publicKey) {
+      console.log('[Push] public-key JSON sans champ publicKey', data);
+      return null;
+    }
+    return data.publicKey;
+  } catch (e) {
+    console.log('[Push] public-key fetch exception', e);
+    return null;
+  }
 }
 
 function urlBase64ToUint8Array(base64String) {
@@ -27,8 +46,8 @@ export async function registerPush() {
   }
   try {
     const reg = await navigator.serviceWorker.ready;
-    const publicKey = await getPublicKey();
-    if (!publicKey) { console.log('[Push] Pas de clé publique côté serveur'); return false; }
+  const publicKey = await getPublicKey();
+  if (!publicKey) { console.log('[Push] Pas de clé publique côté serveur (échec récupération)'); return false; }
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: urlBase64ToUint8Array(publicKey)
