@@ -14,17 +14,8 @@ load_dotenv()
 
 app = Flask(__name__)
 
-# Configuration CORS étendue pour autoriser frontend Netlify
-CORS(app, 
-     origins=[
-         "http://localhost:3000",
-         "https://dreamy-kitten-9d113d.netlify.app",
-         "https://*.netlify.app"
-     ],
-     methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-     allow_headers=['Content-Type', 'Authorization'],
-     supports_credentials=True
-)
+# Configuration CORS simple - utilise CORS_ORIGINS depuis Heroku config vars
+CORS(app)
 
 # Configuration MongoDB
 app.config["MONGO_URI"] = os.getenv("MONGO_URI", "mongodb+srv://dbadmin:<db_password>@cluster0.bnefbon.mongodb.net/us_app")
