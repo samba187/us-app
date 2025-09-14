@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
-import { FiPlus, FiHeart, FiExternalLink } from 'react-icons/fi';
-import { wishlistService, photoService } from '../services/authService';
-import crossNotificationService from '../services/crossNotificationService';
+import { FiPlus, FiExternalLink } from 'react-icons/fi';
+import { authService } from '../services/authService';
 
-const WishlistContainer = styled.div`
+const Container = styled.div`
   padding: 20px;
-  padding-bottom: 120px;
+  max-width: 800px;
+  margin: 0 auto;
 `;
 
 const Header = styled.div`
@@ -17,22 +17,27 @@ const Header = styled.div`
 `;
 
 const Title = styled.h1`
-  font-size: 28px;
-  font-weight: 700;
+  margin: 0;
   color: var(--text-color);
 `;
 
 const AddButton = styled.button`
-  background: linear-gradient(135deg, #ff6b8a, #4ecdc4);
+  background: var(--primary-color);
   color: white;
   border: none;
   padding: 12px 20px;
-  border-radius: 12px;
-  font-weight: 600;
-  cursor: pointer;
+  border-radius: 25px;
   display: flex;
   align-items: center;
   gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: all 0.2s;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+  }
 `;
 
 const WishlistCard = styled.div`
@@ -64,43 +69,21 @@ const WishlistImage = styled.div`
   cursor: pointer;
 `;
 
-// Removed gift emoji icon – replaced by real image or neutral gradient
-
-const StatusBadge = styled.div`
-  position: absolute;
-  top: 10px;
-  right: 10px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  background: ${props => {
-    switch (props.status) {
-      case 'idea': return 'rgba(255, 165, 2, 0.9)';
-      case 'bought': return 'rgba(46, 213, 115, 0.9)';
-      case 'gifted': return 'rgba(255, 107, 138, 0.9)';
-      default: return 'rgba(0, 0, 0, 0.7)';
-    }
-  }};
-  color: white;
-`;
-
 const WishlistContent = styled.div`
   padding: 18px 20px 20px;
 `;
 
 const WishlistTitle = styled.h3`
-  font-size: 18px;
-  font-weight: 600;
+  margin: 0 0 8px 0;
   color: var(--text-color);
-  margin-bottom: 8px;
+  font-size: 18px;
 `;
 
 const ForUser = styled.p`
   color: var(--primary-color);
   font-size: 14px;
-  margin-bottom: 10px;
-  font-weight: 600;
+  margin: 0 0 12px 0;
+  font-weight: 500;
 `;
 
 const WishlistDescription = styled.p`
@@ -108,6 +91,25 @@ const WishlistDescription = styled.p`
   font-size: 14px;
   line-height: 1.4;
   margin: 0 0 14px;
+`;
+
+const StatusBadge = styled.div`
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  background: ${props => {
+    switch(props.status) {
+      case 'idea': return '#3498db';
+      case 'bought': return '#e74c3c';
+      case 'gifted': return '#27ae60';
+      default: return '#95a5a6';
+    }
+  }};
 `;
 
 const ToggleDetails = styled.button`
@@ -146,84 +148,81 @@ const GalleryBadge = styled.button`
 const WishlistActions = styled.div`
   display: flex;
   gap: 8px;
-  align-items: center;
+  margin-bottom: 15px;
+  flex-wrap: wrap;
 `;
 
 const ActionButton = styled.button`
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
+  padding: 8px 16px;
+  border: 2px solid var(--border-color);
   background: white;
-  color: var(--text-color);
-  font-size: 12px;
+  border-radius: 20px;
   cursor: pointer;
-  transition: all 0.3s ease;
-
-  &:hover {
-    background: var(--background-color);
-  }
+  font-size: 14px;
+  transition: all 0.2s;
 
   &.active {
     background: var(--primary-color);
     color: white;
     border-color: var(--primary-color);
   }
+
+  &:hover {
+    border-color: var(--primary-color);
+  }
 `;
 
 const LinkButton = styled.a`
-  padding: 8px 12px;
-  border: 1px solid var(--primary-color);
-  border-radius: 8px;
-  background: white;
-  color: var(--primary-color);
-  font-size: 12px;
+  padding: 8px 16px;
+  border: 2px solid var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+  border-radius: 20px;
   text-decoration: none;
+  font-size: 14px;
   display: flex;
   align-items: center;
-  gap: 4px;
-  transition: all 0.3s ease;
+  gap: 5px;
+  transition: all 0.2s;
 
   &:hover {
-    background: var(--primary-color);
-    color: white;
+    opacity: 0.8;
   }
 `;
 
 const EditDeleteRow = styled.div`
   display: flex;
-  gap: 8px;
-  margin-top: 10px;
+  gap: 10px;
+  margin-top: 15px;
 `;
 
 const EditButton = styled.button`
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #4ecdc4;
-  border-radius: 6px;
+  padding: 10px;
+  border: 1px solid var(--border-color);
   background: white;
-  color: #4ecdc4;
-  font-size: 11px;
+  color: var(--text-color);
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 14px;
 
   &:hover {
-    background: #4ecdc4;
-    color: white;
+    background: #f8f9fa;
   }
 `;
 
 const DeleteButton = styled.button`
   flex: 1;
-  padding: 6px 10px;
-  border: 1px solid #ff6b8a;
-  border-radius: 6px;
+  padding: 10px;
+  border: 1px solid #e74c3c;
   background: white;
-  color: #ff6b8a;
-  font-size: 11px;
+  color: #e74c3c;
+  border-radius: 8px;
   cursor: pointer;
+  font-size: 14px;
 
   &:hover {
-    background: #ff6b8a;
+    background: #e74c3c;
     color: white;
   }
 `;
@@ -234,41 +233,47 @@ const Modal = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: ${props => props.show ? 'flex' : 'none'};
+  background: rgba(0,0,0,0.8);
+  display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 2000;
+  z-index: 1000;
   padding: 20px;
 `;
 
 const ModalContent = styled.div`
   background: white;
-  border-radius: 20px;
+  border-radius: 16px;
   padding: 30px;
   width: 100%;
-  max-width: 400px;
+  max-width: 500px;
   max-height: 80vh;
   overflow-y: auto;
 `;
 
 const ModalTitle = styled.h2`
-  margin-bottom: 20px;
+  margin: 0 0 20px 0;
   color: var(--text-color);
 `;
 
-const Form = styled.form`
-  display: flex;
-  flex-direction: column;
-  gap: 15px;
+const FormGroup = styled.div`
+  margin-bottom: 20px;
+`;
+
+const Label = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color);
+  font-weight: 500;
 `;
 
 const Input = styled.input`
+  width: 100%;
   padding: 12px;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 16px;
-
+  
   &:focus {
     outline: none;
     border-color: var(--primary-color);
@@ -276,42 +281,91 @@ const Input = styled.input`
 `;
 
 const TextArea = styled.textarea`
+  width: 100%;
   padding: 12px;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 16px;
-  min-height: 80px;
+  min-height: 100px;
   resize: vertical;
-  font-family: inherit;
-
+  
   &:focus {
     outline: none;
     border-color: var(--primary-color);
   }
 `;
 
-const FileInput = styled.input`
+const Select = styled.select`
+  width: 100%;
   padding: 12px;
   border: 2px solid var(--border-color);
   border-radius: 8px;
   font-size: 16px;
-
+  
   &:focus {
     outline: none;
     border-color: var(--primary-color);
   }
 `;
 
-const ImageCount = styled.div`
+const ModalActions = styled.div`
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 30px;
+`;
+
+const ModalButton = styled.button`
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 500;
+  
+  &.primary {
+    background: var(--primary-color);
+    color: white;
+  }
+  
+  &.secondary {
+    background: var(--border-color);
+    color: var(--text-color);
+  }
+`;
+
+const ImagePreview = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+`;
+
+const PreviewImage = styled.div`
+  width: 80px;
+  height: 80px;
+  background-image: url(${props => props.src});
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  position: relative;
+`;
+
+const RemoveImageButton = styled.button`
   position: absolute;
-  top: 8px;
-  right: 8px;
-  background: rgba(0, 0, 0, 0.7);
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #e74c3c;
   color: white;
-  padding: 4px 8px;
-  border-radius: 12px;
+  cursor: pointer;
   font-size: 12px;
-  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `;
 
 const ImageGallery = styled.div`
@@ -320,85 +374,49 @@ const ImageGallery = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.9);
-  z-index: 10000;
+  background: rgba(0,0,0,0.9);
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 20px;
-`;
-
-const GalleryHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  max-width: 500px;
-  margin-bottom: 20px;
-  color: white;
-`;
-
-const CloseButton = styled.button`
-  background: none;
-  border: none;
-  color: white;
-  font-size: 24px;
-  cursor: pointer;
-  padding: 8px;
+  z-index: 2000;
 `;
 
 const GalleryImage = styled.img`
-  max-width: 90vw;
-  max-height: 70vh;
+  max-width: 90%;
+  max-height: 90%;
   object-fit: contain;
-  border-radius: 8px;
 `;
 
-const ImageNav = styled.div`
-  display: flex;
-  gap: 20px;
-  margin-top: 20px;
-`;
-
-const NavButton = styled.button`
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  color: white;
-  padding: 12px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-weight: 600;
-  
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-`;
-
-const FormButtons = styled.div`
+const GalleryControls = styled.div`
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
   gap: 10px;
-  margin-top: 20px;
 `;
 
-const Button = styled.button`
-  flex: 1;
-  padding: 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-`;
-
-const PrimaryButton = styled(Button)`
-  background: linear-gradient(135deg, #ff6b8a, #4ecdc4);
+const GalleryButton = styled.button`
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.2);
   color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
 `;
 
-const SecondaryButton = styled(Button)`
-  background: var(--border-color);
-  color: var(--text-color);
+const CloseButton = styled.button`
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
 `;
 
 function Wishlist() {
@@ -409,85 +427,86 @@ function Wishlist() {
   const [viewingImages, setViewingImages] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [expanded, setExpanded] = useState({}); // id -> bool
+  const [couples, setCouples] = useState([]);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     link_url: '',
-    files: null
+    recipient_id: '',
+    status: 'idea'
   });
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
 
   useEffect(() => {
     loadWishlist();
+    loadCouples();
   }, []);
 
   const loadWishlist = async () => {
     try {
-      const data = await wishlistService.getAll();
-      setWishlist(data);
+      const response = await authService.api.get('/api/wishlist');
+      setWishlist(response.data);
     } catch (error) {
       console.error('Erreur lors du chargement de la wishlist:', error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
-  const updateStatus = async (id, newStatus) => {
+  const loadCouples = async () => {
     try {
-      await wishlistService.update(id, { status: newStatus });
-      loadWishlist();
+      const response = await authService.api.get('/api/couples');
+      setCouples(response.data);
     } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'item:', error);
+      console.error('Erreur lors du chargement des couples:', error);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
     try {
-      let imageUrls = [];
+      let uploadedImages = [];
       
-      // Upload de toutes les images sélectionnées
-      if (formData.files && formData.files.length > 0) {
-        try {
-          for (let i = 0; i < formData.files.length; i++) {
-            const uploadData = new FormData();
-            uploadData.append('files', formData.files[i]);
-            uploadData.append('category', 'wishlist');
-            
-            const uploadResult = await photoService.uploadMultipart(uploadData);
-            if (uploadResult && uploadResult.length > 0) {
-              imageUrls.push(uploadResult[0].path);
-            }
-          }
-        } catch (uploadError) {
-          console.error('Erreur upload images:', uploadError);
-        }
+      if (imageFiles.length > 0) {
+        const uploadPromises = imageFiles.map(file => 
+          authService.photoService.uploadMultipart([file])
+        );
+        const uploadResults = await Promise.all(uploadPromises);
+        uploadedImages = uploadResults.flat();
       }
 
-      const itemData = {
-        title: formData.title,
-        description: formData.description,
-        link_url: formData.link_url,
-        image_url: imageUrls.length > 0 ? imageUrls[0] : (editingItem?.image_url || ''), // Image principale pour l'affichage
-        images: imageUrls.length > 0 ? imageUrls : (editingItem?.images || []) // Tableau de toutes les images
+      const wishlistData = {
+        ...formData,
+        images: uploadedImages.map(img => img._id)
       };
 
       if (editingItem) {
-        await wishlistService.update(editingItem._id, itemData);
+        await authService.api.put(`/api/wishlist/${editingItem._id}`, wishlistData);
       } else {
-        await wishlistService.create(itemData);
-        
-        // Déclencher les notifications croisées
-        setTimeout(() => {
-          crossNotificationService.triggerImmediateCheck();
-        }, 1000);
+        await authService.api.post('/api/wishlist', wishlistData);
       }
       
-      setShowModal(false);
-      setEditingItem(null);
-      setFormData({ title: '', description: '', link_url: '', files: null });
-      loadWishlist();
+      await loadWishlist();
+      handleCloseModal();
     } catch (error) {
-      console.error('Erreur:', error);
+      console.error('Erreur lors de la sauvegarde:', error);
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+    setFormData({
+      title: '',
+      description: '',
+      link_url: '',
+      recipient_id: '',
+      status: 'idea'
+    });
+    setSelectedImages([]);
+    setImageFiles([]);
   };
 
   const handleEdit = (item) => {
@@ -496,70 +515,88 @@ function Wishlist() {
       title: item.title,
       description: item.description || '',
       link_url: item.link_url || '',
-      for_user: item.for_user || 'user1',
-      files: null
+      recipient_id: item.recipient_id || '',
+      status: item.status
     });
     setShowModal(true);
   };
 
   const handleDelete = async (id) => {
-    if (window.confirm('Supprimer cet élément ?')) {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
       try {
-        await wishlistService.delete(id);
-        loadWishlist();
+        await authService.api.delete(`/api/wishlist/${id}`);
+        await loadWishlist();
       } catch (error) {
-        console.error('Erreur suppression:', error);
+        console.error('Erreur lors de la suppression:', error);
       }
     }
   };
 
+  const updateStatus = async (id, status) => {
+    try {
+      await authService.api.put(`/api/wishlist/${id}`, { status });
+      await loadWishlist();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
+    }
+  };
+
+  const handleImageSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setImageFiles(prev => [...prev, ...files]);
+    
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImages(prev => [...prev, e.target.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
   const getStatusLabel = (status) => {
-    switch (status) {
+    switch(status) {
       case 'idea': return 'Idée';
       case 'bought': return 'Acheté';
       case 'gifted': return 'Offert';
-      default: return status;
+      default: return 'Idée';
     }
   };
 
   const getUserName = (item) => {
-    const currentUser = JSON.parse(localStorage.getItem('us_user') || '{}');
-    
-    // Si l'item a été créé par l'utilisateur actuel
-    if (item.created_by === currentUser._id) {
-      return 'Toi';
-    } else {
-      // Si l'item a été créé par le/la partenaire  
-      return 'Ton/ta partenaire';
+    if (!item.recipient_id) return 'Moi';
+    const couple = couples.find(c => c._id === item.recipient_id);
+    return couple ? couple.name : 'Inconnu';
+  };
+
+  const getImageUrl = (image) => {
+    if (typeof image === 'string') {
+      return image.startsWith('http') ? image : `/uploads/${image}`;
     }
+    return image?.filename ? `/uploads/${image.filename}` : null;
   };
 
   if (loading) {
-    return (
-      <WishlistContainer>
-        <div style={{ textAlign: 'center', marginTop: '50px' }}>
-          Chargement de la wishlist...
-        </div>
-      </WishlistContainer>
-    );
+    return <Container>Chargement...</Container>;
   }
 
   return (
-    <WishlistContainer className="fade-in">
+    <Container>
       <Header>
         <Title>Wishlist</Title>
-        <AddButton onClick={() => {
-          setEditingItem(null);
-          setFormData({ title: '', description: '', link_url: '', files: null });
-          setShowModal(true);
-        }}>
+        <AddButton onClick={() => setShowModal(true)}>
           <FiPlus /> Ajouter
         </AddButton>
       </Header>
 
       {wishlist.map((item) => {
         const isExpanded = !!expanded[item._id];
-        const cover = item.image_url || (item.images && item.images[0]);
+        const cover = item.image_url || (item.images && item.images[0] && getImageUrl(item.images[0]));
         return (
           <WishlistCard key={item._id} className={isExpanded ? 'expanded' : ''}>
             <WishlistImage
@@ -614,106 +651,134 @@ function Wishlist() {
         );
       })}
 
-      {wishlist.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
-          <FiHeart size={48} style={{ marginBottom: '20px', opacity: 0.3 }} />
-          <p>Aucune idée cadeau pour le moment</p>
-          <p style={{ fontSize: '14px', marginTop: '10px' }}>
-            Ajoutez vos envies et idées cadeaux ! 🎁
-          </p>
-        </div>
+      {showModal && (
+        <Modal onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
+          <ModalContent>
+            <ModalTitle>{editingItem ? 'Modifier' : 'Ajouter'} un élément</ModalTitle>
+            
+            <form onSubmit={handleSubmit}>
+              <FormGroup>
+                <Label>Titre *</Label>
+                <Input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Description</Label>
+                <TextArea
+                  value={formData.description}
+                  onChange={(e) => setFormData({...formData, description: e.target.value})}
+                  placeholder="Description de l'élément..."
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Lien URL</Label>
+                <Input
+                  type="url"
+                  value={formData.link_url}
+                  onChange={(e) => setFormData({...formData, link_url: e.target.value})}
+                  placeholder="https://..."
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Pour qui ?</Label>
+                <Select
+                  value={formData.recipient_id}
+                  onChange={(e) => setFormData({...formData, recipient_id: e.target.value})}
+                >
+                  <option value="">Moi</option>
+                  {couples.map(couple => (
+                    <option key={couple._id} value={couple._id}>{couple.name}</option>
+                  ))}
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Statut</Label>
+                <Select
+                  value={formData.status}
+                  onChange={(e) => setFormData({...formData, status: e.target.value})}
+                >
+                  <option value="idea">Idée</option>
+                  <option value="bought">Acheté</option>
+                  <option value="gifted">Offert</option>
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Images</Label>
+                <Input
+                  type="file"
+                  multiple
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                />
+                {selectedImages.length > 0 && (
+                  <ImagePreview>
+                    {selectedImages.map((src, index) => (
+                      <PreviewImage key={index} src={src}>
+                        <RemoveImageButton onClick={() => removeImage(index)}>
+                          ×
+                        </RemoveImageButton>
+                      </PreviewImage>
+                    ))}
+                  </ImagePreview>
+                )}
+              </FormGroup>
+
+              <ModalActions>
+                <ModalButton type="button" className="secondary" onClick={handleCloseModal}>
+                  Annuler
+                </ModalButton>
+                <ModalButton type="submit" className="primary">
+                  {editingItem ? 'Modifier' : 'Ajouter'}
+                </ModalButton>
+              </ModalActions>
+            </form>
+          </ModalContent>
+        </Modal>
       )}
 
-      <Modal show={showModal} onClick={() => setShowModal(false)}>
-        <ModalContent onClick={(e) => e.stopPropagation()}>
-          <ModalTitle>{editingItem ? 'Modifier l\'élément' : 'Nouveau souhait'}</ModalTitle>
-          <Form onSubmit={handleSubmit}>
-            <Input
-              type="text"
-              placeholder="Titre"
-              value={formData.title}
-              onChange={(e) => setFormData({...formData, title: e.target.value})}
-              required
-            />
-            
-            <TextArea
-              placeholder="Description"
-              value={formData.description}
-              onChange={(e) => setFormData({...formData, description: e.target.value})}
-            />
-            
-            <Input
-              type="url"
-              placeholder="Lien (optionnel)"
-              value={formData.link_url}
-              onChange={(e) => setFormData({...formData, link_url: e.target.value})}
-            />
-            
-            <FileInput
-              type="file"
-              multiple
-              accept="image/*"
-              onChange={(e) => setFormData({...formData, files: e.target.files})}
-            />
-            
-            <FormButtons>
-              <SecondaryButton type="button" onClick={() => setShowModal(false)}>
-                Annuler
-              </SecondaryButton>
-              <PrimaryButton type="submit">
-                {editingItem ? 'Modifier' : 'Créer'}
-              </PrimaryButton>
-            </FormButtons>
-          </Form>
-        </ModalContent>
-      </Modal>
-
-      {/* Galerie d'images */}
       {viewingImages && (
         <ImageGallery onClick={() => setViewingImages(null)}>
-          <GalleryHeader>
-            <h3>{viewingImages.title}</h3>
-            <CloseButton onClick={() => setViewingImages(null)}>×</CloseButton>
-          </GalleryHeader>
-          
-          {viewingImages.images && viewingImages.images.length > 0 && (
-            <div style={{ textAlign: 'center' }}>
-              <GalleryImage 
-                src={viewingImages.images[currentImageIndex] || viewingImages.image_url} 
-                alt={viewingImages.title}
-                onClick={(e) => e.stopPropagation()}
-              />
-              
-              {viewingImages.images.length > 1 && (
-                <ImageNav>
-                  <NavButton 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentImageIndex(prev => prev > 0 ? prev - 1 : viewingImages.images.length - 1);
-                    }}
-                  >
-                    ‹ Précédent
-                  </NavButton>
-                  
-                  <span style={{ color: 'white', alignSelf: 'center' }}>
-                    {currentImageIndex + 1} / {viewingImages.images.length}
-                  </span>
-                  
-                  <NavButton 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setCurrentImageIndex(prev => prev < viewingImages.images.length - 1 ? prev + 1 : 0);
-                    }}
-                  >
-                    Suivant ›
-                  </NavButton>
-                </ImageNav>
-              )}
-            </div>
+          <CloseButton onClick={() => setViewingImages(null)}>×</CloseButton>
+          <GalleryImage 
+            src={getImageUrl(viewingImages.images[currentImageIndex])}
+            alt="Wishlist item"
+          />
+          {viewingImages.images.length > 1 && (
+            <GalleryControls>
+              <GalleryButton 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(prev => 
+                    prev > 0 ? prev - 1 : viewingImages.images.length - 1
+                  );
+                }}
+              >
+                Précédent
+              </GalleryButton>
+              <GalleryButton 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(prev => 
+                    prev < viewingImages.images.length - 1 ? prev + 1 : 0
+                  );
+                }}
+              >
+                Suivant
+              </GalleryButton>
+            </GalleryControls>
           )}
         </ImageGallery>
       )}
-    </WishlistContainer>
+    </Container>
   );
 }
 
