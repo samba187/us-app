@@ -37,39 +37,34 @@ const AddButton = styled.button`
 
 const WishlistCard = styled.div`
   background: white;
-  border-radius: 16px;
+  border-radius: 18px;
   box-shadow: var(--shadow);
-  margin-bottom: 15px;
+  margin-bottom: 18px;
   overflow: hidden;
+  border: 1px solid var(--border-color);
+  transition: box-shadow .25s, transform .25s;
+  &.expanded {
+    box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
+  }
 `;
 
 const WishlistImage = styled.div`
-  height: 120px;
-  background: ${props => {
-    if (props.image) {
-      // Gérer les différents formats de chemin d'image
-      const imagePath = props.image.startsWith('http') 
-        ? props.image 
-        : props.image.startsWith('/') 
-          ? props.image 
-          : `/${props.image}`;
-      return `url(${imagePath})`;
+  height: 140px;
+  background: ${({ image }) => {
+    if (image) {
+      const p = image.startsWith('http') ? image : (image.startsWith('/') ? image : `/${image}`);
+      return `url(${p})`;
     }
-    return 'linear-gradient(135deg, #f093fb, #f5576c)';
+    return 'linear-gradient(135deg,#ddd,#bbb)';
   }};
   background-size: cover;
   background-position: center;
   position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: pointer;
 `;
 
-const WishlistIcon = styled.div`
-  font-size: 48px;
-  color: white;
-  opacity: 0.8;
-`;
+// Removed gift emoji icon – replaced by real image or neutral gradient
 
 const StatusBadge = styled.div`
   position: absolute;
@@ -91,7 +86,7 @@ const StatusBadge = styled.div`
 `;
 
 const WishlistContent = styled.div`
-  padding: 20px;
+  padding: 18px 20px 20px;
 `;
 
 const WishlistTitle = styled.h3`
@@ -112,7 +107,40 @@ const WishlistDescription = styled.p`
   color: var(--text-color);
   font-size: 14px;
   line-height: 1.4;
-  margin-bottom: 15px;
+  margin: 0 0 14px;
+`;
+
+const ToggleDetails = styled.button`
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border-radius: 14px;
+  cursor: pointer;
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const GalleryBadge = styled.button`
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
 `;
 
 const WishlistActions = styled.div`
@@ -380,6 +408,7 @@ function Wishlist() {
   const [editingItem, setEditingItem] = useState(null);
   const [viewingImages, setViewingImages] = useState(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [expanded, setExpanded] = useState({}); // id -> bool
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -528,75 +557,62 @@ function Wishlist() {
         </AddButton>
       </Header>
 
-      {wishlist.map((item) => (
-        <WishlistCard key={item._id}>
-          <WishlistImage 
-            image={item.image_url} 
-            onClick={() => {
-              if (item.images && item.images.length > 1) {
-                setCurrentImageIndex(0);
-                setViewingImages(item);
-              }
-            }}
-            style={{ cursor: item.images && item.images.length > 1 ? 'pointer' : 'default' }}
-          >
-            {!item.image_url && (
-              <WishlistIcon>🎁</WishlistIcon>
-            )}
-            <StatusBadge status={item.status}>
-              {getStatusLabel(item.status)}
-            </StatusBadge>
-            {item.images && item.images.length > 1 && (
-              <ImageCount>📷 {item.images.length}</ImageCount>
-            )}
-          </WishlistImage>
-          
-          <WishlistContent>
-            <WishlistTitle>{item.title}</WishlistTitle>
-            <ForUser>💝 Pour {getUserName(item)}</ForUser>
-            
-            {item.description && (
-              <WishlistDescription>{item.description}</WishlistDescription>
-            )}
-            
-            <WishlistActions>
-              <ActionButton
-                className={item.status === 'idea' ? 'active' : ''}
-                onClick={() => updateStatus(item._id, 'idea')}
-              >
-                Idée
-              </ActionButton>
-              <ActionButton
-                className={item.status === 'bought' ? 'active' : ''}
-                onClick={() => updateStatus(item._id, 'bought')}
-              >
-                Acheté
-              </ActionButton>
-              <ActionButton
-                className={item.status === 'gifted' ? 'active' : ''}
-                onClick={() => updateStatus(item._id, 'gifted')}
-              >
-                Offert
-              </ActionButton>
-              
-              {item.link_url && (
-                <LinkButton href={item.link_url} target="_blank" rel="noopener noreferrer">
-                  <FiExternalLink /> Voir
-                </LinkButton>
+      {wishlist.map((item) => {
+        const isExpanded = !!expanded[item._id];
+        const cover = item.image_url || (item.images && item.images[0]);
+        return (
+          <WishlistCard key={item._id} className={isExpanded ? 'expanded' : ''}>
+            <WishlistImage
+              image={cover}
+              onClick={() => setExpanded(prev => ({ ...prev, [item._id]: !prev[item._id] }))}
+            >
+              <StatusBadge status={item.status}>{getStatusLabel(item.status)}</StatusBadge>
+              {item.images && item.images.length > 1 && (
+                <GalleryBadge
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentImageIndex(0);
+                    setViewingImages(item);
+                  }}
+                >📷 {item.images.length}</GalleryBadge>
               )}
-            </WishlistActions>
-            
-            <EditDeleteRow>
-              <EditButton onClick={() => handleEdit(item)}>
-                Modifier
-              </EditButton>
-              <DeleteButton onClick={() => handleDelete(item._id)}>
-                Supprimer
-              </DeleteButton>
-            </EditDeleteRow>
-          </WishlistContent>
-        </WishlistCard>
-      ))}
+              {!cover && <ToggleDetails onClick={(e)=>{e.stopPropagation();setExpanded(p=>({...p,[item._id]:!p[item._id]}));}}>Détails</ToggleDetails>}
+            </WishlistImage>
+            {isExpanded && (
+              <WishlistContent>
+                <WishlistTitle>{item.title}</WishlistTitle>
+                <ForUser>Pour {getUserName(item)}</ForUser>
+                {item.description && (
+                  <WishlistDescription>{item.description}</WishlistDescription>
+                )}
+                <WishlistActions>
+                  <ActionButton
+                    className={item.status === 'idea' ? 'active' : ''}
+                    onClick={() => updateStatus(item._id, 'idea')}
+                  >Idée</ActionButton>
+                  <ActionButton
+                    className={item.status === 'bought' ? 'active' : ''}
+                    onClick={() => updateStatus(item._id, 'bought')}
+                  >Acheté</ActionButton>
+                  <ActionButton
+                    className={item.status === 'gifted' ? 'active' : ''}
+                    onClick={() => updateStatus(item._id, 'gifted')}
+                  >Offert</ActionButton>
+                  {item.link_url && (
+                    <LinkButton href={item.link_url} target="_blank" rel="noopener noreferrer">
+                      <FiExternalLink /> Voir
+                    </LinkButton>
+                  )}
+                </WishlistActions>
+                <EditDeleteRow>
+                  <EditButton onClick={() => handleEdit(item)}>Modifier</EditButton>
+                  <DeleteButton onClick={() => handleDelete(item._id)}>Supprimer</DeleteButton>
+                </EditDeleteRow>
+              </WishlistContent>
+            )}
+          </WishlistCard>
+        );
+      })}
 
       {wishlist.length === 0 && (
         <div style={{ textAlign: 'center', padding: '40px', color: 'var(--text-light)' }}>
