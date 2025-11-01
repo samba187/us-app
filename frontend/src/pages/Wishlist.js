@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { FiPlus, FiExternalLink } from 'react-icons/fi';
 import { authService } from '../services/authService';
+import { ensurePushSubscribed, getPermissionStatus } from '../services/notificationService';
 
 const Container = styled.div`
   padding: 15px;
@@ -66,6 +67,26 @@ const AddButton = styled.button`
     font-size: 18px;
     border-radius: 12px;
     min-height: 56px;
+  }
+`;
+
+const NotifyButton = styled.button`
+  background: white;
+  color: var(--primary-color);
+  border: 2px solid var(--primary-color);
+  padding: 12px 16px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 14px;
+  min-height: 44px;
+  transition: all 0.2s;
+  white-space: nowrap;
+
+  &:hover { opacity: 0.85; }
+
+  @media (max-width: 768px) {
+    width: 100%;
   }
 `;
 
@@ -478,6 +499,7 @@ const CloseButton = styled.button`
 function Wishlist() {
   const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [notifPermission, setNotifPermission] = useState('default');
   const [showModal, setShowModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [viewingImages, setViewingImages] = useState(null);
@@ -497,6 +519,7 @@ function Wishlist() {
   useEffect(() => {
     loadWishlist();
     loadCouples();
+    (async () => { setNotifPermission(await getPermissionStatus()); })();
   }, []);
 
   const loadWishlist = async () => {
@@ -651,23 +674,61 @@ function Wishlist() {
 
   const getImageUrl = (image) => {
     if (typeof image === 'string') {
-      return image.startsWith('http') ? image : `/uploads/${image}`;
+      if (image.startsWith('http')) return image;
+      if (image.startsWith('/uploads/')) return image;
+      return `/uploads/${image}`;
     }
-    return image?.filename ? `/uploads/${image.filename}` : null;
+    if (!image) return null;
+    if (image.url) return image.url;
+    if (image.filename) return `/uploads/${image.filename}`;
+    return null;
   };
 
   if (loading) {
-    return <Container>Chargement...</Container>;
+    return (
+      <Container>
+        <div className="skeleton" style={{height:140, borderRadius:16, marginBottom:12}} />
+        <div className="skeleton" style={{height:140, borderRadius:16, marginBottom:12}} />
+        <div className="skeleton" style={{height:140, borderRadius:16}} />
+      </Container>
+    );
   }
 
   return (
     <Container>
       <Header>
         <Title>Wishlist</Title>
-        <AddButton onClick={() => setShowModal(true)}>
-          <FiPlus /> Ajouter
-        </AddButton>
+        <div style={{display:'flex', gap:10}}>
+          {notifPermission !== 'granted' && (
+            <NotifyButton onClick={async () => {
+              try {
+                await ensurePushSubscribed();
+                setNotifPermission('granted');
+              } catch (e) {
+                alert("Impossible d'activer les notifications");
+              }
+            }}>
+              Activer les notifications
+            </NotifyButton>
+          )}
+          <AddButton onClick={() => setShowModal(true)}>
+            <FiPlus /> Ajouter
+          </AddButton>
+        </div>
       </Header>
+
+      {(!loading && wishlist.length === 0) && (
+        <div style={{
+          background:'white',border:'1px solid var(--border-color)',borderRadius:16,padding:24,
+          textAlign:'center',color:'var(--text-color)',boxShadow:'var(--shadow)',marginBottom:18
+        }}>
+          <div style={{fontSize:18,fontWeight:600,marginBottom:8}}>Votre wishlist est vide</div>
+          <div style={{opacity:0.8,marginBottom:16}}>Ajoutez vos idées cadeaux, liens et photos pour vous ou votre partenaire.</div>
+          <AddButton onClick={() => setShowModal(true)}>
+            <FiPlus /> Ajouter un premier élément
+          </AddButton>
+        </div>
+      )}
 
       {wishlist.map((item) => {
         const isExpanded = !!expanded[item._id];

@@ -1,7 +1,33 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
  :root {
-  --primary-color: #6c5ce7;
+  --primary-color: #ff6b8a;
+  --primary-2: #ff6b8a;
   --text-color: #2d3436;
+  --muted-text: #636e72;
   --border-color: #dfe6e9;
+  --bg: #f5f6fa;
+  --card-bg: #ffffff;
   --shadow: 0 4px 12px rgba(0,0,0,0.08);
  }
- body { margin:0; font-family: system-ui, Arial, sans-serif; background:#f5f6fa; }
+ [data-theme="dark"] {
+  --text-color: #eaeaea;
+  --muted-text: #c9c9c9;
+  --border-color: #3a3d40;
+  --bg: #16181a;
+  --card-bg: #1d2023;
+  --shadow: 0 4px 12px rgba(0,0,0,0.4);
+ }
+ body { margin:0; font-family: Inter, system-ui, Arial, sans-serif; background:var(--bg); color:var(--text-color); }
+
+/* Utility */
+button { font-family: inherit; }
+a { color: inherit; }
+
+/* Transitions */
+.fade-in { animation: fadeIn .25s ease-out; }
+@keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: none; } }
+
+/* Skeleton */
+.skeleton { position: relative; overflow: hidden; background: linear-gradient(90deg, rgba(0,0,0,0.06), rgba(0,0,0,0.12), rgba(0,0,0,0.06)); background-size: 200% 100%; animation: shimmer 1.1s infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
