@@ -1,7 +1,7 @@
 // Basic auth & API service with token persistence and photo upload helper
 import axios from 'axios';
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
+const API_BASE = process.env.REACT_APP_API_URL || 'https://us-app-42e964cf340b.herokuapp.com/api';
 function getToken() {
 	return localStorage.getItem('access_token');
 }
