@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import Reminders from './pages/Reminders';
 import Notes from './pages/Notes';
 import Photos from './pages/Photos';
+import Restaurants from './pages/Restaurants';
 import OnboardingCouple from './pages/OnboardingCouple';
 import Profile from './pages/Profile';
 import { authService } from './services/authService';
@@ -35,30 +36,35 @@ function AppShell({ children, path, navigate }) {
   }, [path]);
   return (
     <div>
-      <header style={{position:'sticky', top:0, zIndex:101, background:'var(--card-bg)', borderBottom:'1px solid var(--border-color)'}}>
-        <div style={{maxWidth:800, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'10px 15px'}}>
+      <header style={{position:'sticky', top:0, zIndex:101, borderBottom:'1px solid var(--border-color)'}}>
+        <div className="glass" style={{maxWidth:900, margin:'0 auto', display:'flex', alignItems:'center', justifyContent:'space-between', padding:'12px 16px'}}>
           <div style={{display:'flex', alignItems:'center', gap:10}}>
-            <img src="/logo.svg" alt="US" width="28" height="28" />
-            <div style={{fontWeight:700, color:'var(--text-color)'}}>{title}</div>
+            <img src="/logo.svg" alt="US" width="28" height="28" style={{filter:'drop-shadow(0 0 10px rgba(124,58,237,.35))'}} />
+            <div style={{fontWeight:700, letterSpacing:.3, color:'var(--text-color)'}}>{title}</div>
           </div>
-          <button onClick={()=>navigate('/profile')} style={{width:34, height:34, borderRadius:20, border:'1px solid var(--border-color)', background:'#fff', cursor:'pointer'}} title="Profil">
+          <button onClick={()=>navigate('/profile')} style={{width:38, height:38, borderRadius:20, border:'1px solid var(--border-color)', background:'rgba(255,255,255,0.08)', color:'var(--text-color)', cursor:'pointer'}} title="Profil">
             🙂
           </button>
         </div>
       </header>
-      <main className="fade-in" style={{paddingBottom:64}}>{children}</main>
+      <main className="fade-slide" style={{paddingBottom:72}}>{children}</main>
       <Navigation current={path} onNavigate={navigate} />
     </div>
   );
 }
 
-function Router({ path, navigate }) {
+function Router({ path, navigate, needsOnboarding }) {
+  // Forcer onboarding si pas de couple (sauf si déjà sur /onboarding ou /profile)
+  if (needsOnboarding && !['/onboarding', '/profile'].some(p => path.startsWith(p))) {
+    return <OnboardingCouple navigate={navigate} />;
+  }
   if (path === '/') return <Home navigate={navigate} />;
   if (path.startsWith('/wishlist')) return <Wishlist />;
   if (path.startsWith('/reminders')) return <Reminders />;
   if (path.startsWith('/photos')) return <Photos />;
+  if (path.startsWith('/restaurants')) return <Restaurants />;
   if (path.startsWith('/notes')) return <Notes />;
-  if (path.startsWith('/onboarding')) return <OnboardingCouple />;
+  if (path.startsWith('/onboarding')) return <OnboardingCouple navigate={navigate} />;
   if (path.startsWith('/profile')) return <Profile />;
   return <Home navigate={navigate} />;
 }
@@ -66,12 +72,30 @@ function Router({ path, navigate }) {
 function App() {
   const { path, navigate } = useHashRouter();
   const [authed, setAuthed] = useState(!!localStorage.getItem('access_token'));
+  const [coupleStatus, setCoupleStatus] = useState(null);
+  
   useEffect(() => { authService.init(); }, []);
+  useEffect(() => {
+    const t = localStorage.getItem('theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light');
+  }, []);
+  
+  useEffect(() => {
+    if (authed) {
+      authService.api.get('/api/couple/me').then(r => {
+        setCoupleStatus(r.data?.in_couple ? 'ok' : 'needs_onboarding');
+      }).catch(() => setCoupleStatus('needs_onboarding'));
+    }
+  }, [authed]);
+  
   if (!authed) return <Login onLogin={()=>setAuthed(true)} />;
+  
+  const needsOnboarding = coupleStatus === 'needs_onboarding';
+  
   return (
     <ErrorBoundary>
       <AppShell path={path} navigate={navigate}>
-        <Router path={path} navigate={navigate} />
+        <Router path={path} navigate={navigate} needsOnboarding={needsOnboarding} />
       </AppShell>
     </ErrorBoundary>
   );

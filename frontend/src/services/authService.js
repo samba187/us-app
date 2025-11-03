@@ -1,7 +1,7 @@
 // Basic auth & API service with token persistence and photo upload helper
 import axios from 'axios';
 
-const API_BASE = 'http://localhost:5000';
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
 
 function getToken() {
 	return localStorage.getItem('access_token');
@@ -43,7 +43,7 @@ export const authService = {
 			const fd = new FormData();
 			files.forEach(f => fd.append('files', f));
 			const token = getToken();
-			const res = await fetch('/api/photos', {
+			const res = await fetch(`${API_BASE}/api/photos`, {
 				method: 'POST',
 				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
 				body: fd
