@@ -4,10 +4,57 @@ import { authService } from '../services/authService';
 
 const Container = styled.div` padding:15px; max-width:800px; margin:0 auto; `;
 const Title = styled.h1` margin:0 0 14px 0; color:var(--text-color); `;
-const Card = styled.div` background:#fff; border:1px solid var(--border-color); border-radius:14px; padding:14px; box-shadow:var(--shadow); margin-bottom:12px; `;
+const Card = styled.div` 
+  background: rgba(255, 255, 255, 0.06); 
+  border: 1px solid rgba(255, 255, 255, 0.12); 
+  border-radius: 14px; 
+  padding: 14px; 
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15); 
+  margin-bottom: 12px;
+  
+  @supports (backdrop-filter: blur(10px)) {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+`;
 const Row = styled.div` display:flex; gap:8px; align-items:center; flex-wrap:wrap; `;
-const Input = styled.input` flex:1; min-width:180px; padding:10px; border:2px solid var(--border-color); border-radius:8px; `;
-const Select = styled.select` padding:10px; border:2px solid var(--border-color); border-radius:8px; `;
+const Input = styled.input` 
+  flex:1; 
+  min-width:180px; 
+  padding:10px; 
+  border:2px solid rgba(255, 255, 255, 0.12); 
+  border-radius:8px; 
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-color);
+  
+  &:focus {
+    outline: none;
+    border-color: var(--neon-1);
+    box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
+  }
+  
+  &::placeholder {
+    color: var(--muted-text);
+  }
+`;
+const Select = styled.select` 
+  padding:10px; 
+  border:2px solid var(--border-color); 
+  border-radius:8px; 
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-color);
+
+  option {
+    background: #1a1d2e;
+    color: var(--text-color);
+    padding: 10px;
+  }
+
+  option:checked {
+    background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
+    color: #fff;
+  }
+`;
 const Button = styled.button` padding:10px 14px; border:none; border-radius:8px; background:var(--primary-color); color:#fff; cursor:pointer; `;
 
 export default function Activities() {

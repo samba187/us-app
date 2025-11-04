@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg 
+    version="1.1" 
+    baseProfile="full"
+    width="300" height="120" 
+    viewBox="0 0 300 120"
+    xmlns="http://www.w3.org/2000/svg"
+>
+
+  <!-- Définition du dégradé -->
+  <defs>
+    <linearGradient id="gradNeoPush" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%"  stop-color="#7F7FD5" />
+      <stop offset="100%" stop-color="#86A8E7" />
+    </linearGradient>
+  </defs>
+
+  <!-- SYMBOLE "N" STYLISÉ -->
+  <path 
+    fill="none"
+    stroke="url(#gradNeoPush)"
+    stroke-width="16"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    d="
+      M 30,100 
+      L 30,20 
+      L 85,70 
+      L 85,35 
+      L 125,65 
+      Q 130,68 135,60 
+      L 145,45
+    "
+  />
+
+  <!-- TEXTE “NeoPush” avec Montserrat -->
+  <text 
+    x="160" 
+    y="80" 
+    font-family="'Montserrat', sans-serif" 
+    font-weight="700"
+    font-size="32"
+    fill="#333"
+  >
+    NeoPush
+  </text>
+</svg>

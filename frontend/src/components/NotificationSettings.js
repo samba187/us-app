@@ -3,15 +3,56 @@ import styled from 'styled-components';
 import { ensurePushSubscribed, getPermissionStatus, testPush } from '../services/notificationService';
 
 const Wrap = styled.div`
-  background: white; border:1px solid var(--border-color); border-radius: 16px; padding: 16px; box-shadow: var(--shadow);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+
+  @supports (backdrop-filter: blur(10px)) {
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
 `;
 
 const Row = styled.div`
-  display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    align-items: stretch;
+  }
 `;
 
 const Button = styled.button`
-  background: var(--primary-color); color:#fff; border:none; border-radius:10px; padding:10px 14px; cursor:pointer;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
+  color: #fff;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.3);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(124, 58, 237, 0.4);
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  @media (max-width: 768px) {
+    width: 100%;
+  }
 `;
 
 export default function NotificationSettings() {
@@ -36,11 +77,11 @@ export default function NotificationSettings() {
     <Wrap>
       <Row>
         <div>
-          <div style={{fontWeight:600}}>Notifications</div>
-          <div style={{opacity:.8, fontSize:13}}>Statut: {status}</div>
+          <div style={{fontWeight:600, fontSize:16, color:'var(--text-color)', marginBottom:4}}>Notifications</div>
+          <div style={{fontSize:13, color:'var(--muted-text)'}}>Statut: {status}</div>
         </div>
         {status !== 'granted' ? (
-          <Button onClick={enable} disabled={busy}>{busy ? '...' : 'Activer'}</Button>
+          <Button onClick={enable} disabled={busy}>{busy ? 'Activation...' : 'Activer'}</Button>
         ) : (
           <Button onClick={sendTest}>Tester</Button>
         )}

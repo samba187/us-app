@@ -230,6 +230,45 @@ def couple_join():
     users_col.update_one({"_id": u["_id"]}, {"$set": {"couple_id": c["_id"]}})
     return {"ok": True, "couple_id": str(c["_id"])}
 
+@app.get("/api/me")
+@jwt_required()
+def get_me():
+    u = current_user()
+    if not u:
+        return {"error": "unauth"}, 401
+    return {"_id": str(u["_id"]), "name": u["name"], "email": u["email"], "avatar_url": u.get("avatar_url",""), "couple_id": str(u.get("couple_id")) if u.get("couple_id") else None}
+
+@app.put("/api/me")
+@app.post("/api/me")
+@jwt_required()
+def update_me():
+    u = current_user()
+    if not u:
+        return {"error": "unauth"}, 401
+    # Support multipart for avatar upload
+    if request.content_type and 'multipart/form-data' in request.content_type:
+        f = request.files.get('file')
+        if not f:
+            return {"error": "no_file"}, 400
+        try:
+            url = save_file(f)
+            users_col.update_one({"_id": u["_id"]}, {"$set": {"avatar_url": url}})
+            return {"avatar_url": url}
+        except Exception as e:
+            return {"error": "upload_failed", "detail": str(e)}, 500
+    # JSON update (name / avatar_url)
+    data = request.get_json() or {}
+    fields = {}
+    if 'name' in data:
+        name = (data.get('name') or '').strip()
+        if name:
+            fields['name'] = name
+    if 'avatar_url' in data:
+        fields['avatar_url'] = data.get('avatar_url') or ''
+    if fields:
+        users_col.update_one({"_id": u["_id"]}, {"$set": fields})
+    return {"msg": "updated"}
+
 @app.get("/api/couple/me")
 @jwt_required()
 def couple_me():
@@ -239,7 +278,7 @@ def couple_me():
         return {"in_couple": False}
     c = couples_col.find_one({"_id": cid})
     members = list(users_col.find({"_id": {"$in": c["members"]}}, {"password":0}))
-    return {"in_couple": True, "couple_id": str(cid), "invite_code": c.get("invite_code"), "members": [{"id": str(m["_id"]), "name": m["name"], "email": m["email"], "avatar_url": m.get("avatar_url","")} for m in members]}
+    return {"in_couple": True, "couple_id": str(cid), "invite_code": c.get("invite_code"), "members": [{"_id": str(m["_id"]), "name": m["name"], "email": m["email"], "avatar_url": m.get("avatar_url","")} for m in members]}
 
 # ───────── Reminders ─────────
 @app.get("/api/reminders")
@@ -456,24 +495,37 @@ def wishlist_delete(u, cid, wid):
 # ───────── Photos ─────────
 @app.get("/api/photos")
 @jwt_required()
-@require_couple
-def photos_list(u, cid):
-    items = list(photos_col.find({"couple_id": cid}).sort("uploaded_at",-1))
+def photos_list():
+    u = current_user()
+    if not u: return {"error":"unauth"}, 401
+    cid = u.get("couple_id")
+    # Si couple: photos du couple, sinon: photos perso
+    query = {"couple_id": cid} if cid else {"uploaded_by": str(u["_id"]), "couple_id": None}
+    items = list(photos_col.find(query).sort("uploaded_at",-1))
     return jsonify([serialize(x) for x in items])
 
 @app.post("/api/photos")
 @jwt_required()
-@require_couple
-def photos_create(u, cid):
+def photos_create():
+    u = current_user()
+    if not u: return {"error":"unauth"}, 401
+    cid = u.get("couple_id")
     if request.content_type and 'multipart/form-data' in request.content_type:
         files = request.files.getlist('files')
         caption = request.form.get('caption','')
         album_id = request.form.get('album_id') or None
+        taken_at_str = request.form.get('taken_at','')
+        taken_at = None
+        if taken_at_str:
+            try:
+                taken_at = dt.datetime.fromisoformat(taken_at_str.replace('Z', '+00:00'))
+            except:
+                taken_at = None
         created = []
         for f in files:
             try:
                 url = save_file(f)
-                item = {"url": url, "caption": caption, "album_id": album_id, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
+                item = {"url": url, "caption": caption, "album_id": album_id, "taken_at": taken_at, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
                 res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
                 created.append(serialize(item))
             except Exception as e:
@@ -481,7 +533,13 @@ def photos_create(u, cid):
         return jsonify(created), 201
     data = request.get_json() or {}
     if not data.get('url'): return {"error":"missing_url"}, 400
-    item = {"url": data["url"], "caption": data.get("caption",""), "album_id": data.get("album_id"), "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
+    taken_at = None
+    if data.get('taken_at'):
+        try:
+            taken_at = dt.datetime.fromisoformat(data['taken_at'].replace('Z', '+00:00'))
+        except:
+            taken_at = None
+    item = {"url": data["url"], "caption": data.get("caption",""), "album_id": data.get("album_id"), "taken_at": taken_at, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
     res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
     return jsonify(serialize(item)), 201
 
@@ -490,7 +548,13 @@ def photos_create(u, cid):
 @require_couple
 def photos_update(u, cid, pid):
     data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["caption","album_id"]}
+    fields = {k: v for k,v in data.items() if k in ["caption","album_id","taken_at"]}
+    # Convert taken_at if present
+    if "taken_at" in fields and fields["taken_at"]:
+        try:
+            fields["taken_at"] = dt.datetime.fromisoformat(fields["taken_at"].replace('Z', '+00:00'))
+        except:
+            fields["taken_at"] = None
     photos_col.update_one({"_id": oid(pid), "couple_id": cid}, {"$set": fields})
     return {"msg":"updated"}
 
@@ -509,6 +573,42 @@ def photos_delete(u, cid, pid):
             if os.path.isfile(fpath): os.remove(fpath)
     except Exception as e:
         print('file delete err', e)
+    return {"msg":"deleted"}
+
+# ───────── Albums ─────────
+@app.get("/api/albums")
+@jwt_required()
+@require_couple
+def albums_list(u, cid):
+    items = list(db["albums"].find({"couple_id": cid}).sort("created_at",-1))
+    return jsonify([serialize(x) for x in items])
+
+@app.post("/api/albums")
+@jwt_required()
+@require_couple
+def albums_create(u, cid):
+    data = request.get_json() or {}
+    if not data.get('title'): return {"error":"missing_title"}, 400
+    item = {"title": data["title"], "description": data.get("description",""), "cover_url": data.get("cover_url",""), "created_by": str(u["_id"]), "created_at": dt.datetime.utcnow(), "couple_id": cid}
+    res = db["albums"].insert_one(item); item["_id"]=str(res.inserted_id)
+    return jsonify(serialize(item)), 201
+
+@app.put("/api/albums/<aid>")
+@jwt_required()
+@require_couple
+def albums_update(u, cid, aid):
+    data = request.get_json() or {}
+    fields = {k: v for k,v in data.items() if k in ["title","description","cover_url"]}
+    db["albums"].update_one({"_id": oid(aid), "couple_id": cid}, {"$set": fields})
+    return {"msg":"updated"}
+
+@app.delete("/api/albums/<aid>")
+@jwt_required()
+@require_couple
+def albums_delete(u, cid, aid):
+    db["albums"].delete_one({"_id": oid(aid), "couple_id": cid})
+    # Optionally: remove album_id from all photos in this album
+    photos_col.update_many({"album_id": aid, "couple_id": cid}, {"$set": {"album_id": None}})
     return {"msg":"deleted"}
 
 # ───────── Notes ─────────
