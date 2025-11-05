@@ -1,11 +1,7 @@
 // Basic auth & API service with token persistence and photo upload helper
 import axios from 'axios';
 
-<<<<<<< HEAD
 const API_BASE = process.env.REACT_APP_API_BASE || process.env.REACT_APP_API_URL || 'http://localhost:5000';
-=======
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 
 function getToken() {
 	return localStorage.getItem('access_token');

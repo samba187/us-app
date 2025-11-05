@@ -238,7 +238,6 @@ def get_me():
         return {"error": "unauth"}, 401
     return {"_id": str(u["_id"]), "name": u["name"], "email": u["email"], "avatar_url": u.get("avatar_url",""), "couple_id": str(u.get("couple_id")) if u.get("couple_id") else None}
 
-<<<<<<< HEAD
 @app.put("/api/me")
 @app.post("/api/me")
 @jwt_required()
@@ -270,8 +269,6 @@ def update_me():
         users_col.update_one({"_id": u["_id"]}, {"$set": fields})
     return {"msg": "updated"}
 
-=======
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 @app.get("/api/couple/me")
 @jwt_required()
 def couple_me():
@@ -299,7 +296,16 @@ def reminders_create(u, cid):
     item = {"title": data["title"], "description": data.get("description",""), "created_by": str(u["_id"]), "assigned_to": data.get("assigned_to"), "priority": data.get("priority","normal"), "due_date": iso_to_dt(data.get("due_date")), "status": "pending", "created_at": dt.datetime.utcnow(), "couple_id": cid}
     res = reminders_col.insert_one(item); item["_id"]=str(res.inserted_id)
     try:
-        payload = {'type': 'reminder_created','title': 'Nouveau rappel','body': f"{item['title']} (prio: {item['priority']})",'url': '/reminders'}
+        # Notification avec priorité selon l'urgence
+        priority_emoji = '🔴' if item['priority'] == 'urgent' else ('🟠' if item['priority'] == 'important' else '🔵')
+        payload = {
+            'type': 'reminder_created',
+            'title': f"{priority_emoji} Nouveau rappel",
+            'body': f"{item['title']}",
+            'url': '/reminders',
+            'priority': item['priority'],
+            'requireInteraction': item['priority'] == 'urgent'
+        }
         broadcast_push(cid, u['email'], payload)
     except Exception as e:
         if DEBUG_PUSH: print('[PUSH][REMINDER][ERROR]', e)
@@ -344,6 +350,11 @@ def restaurants_create(u, cid):
     data = request.get_json() or {}
     item = {"name": data["name"], "address": data.get("address",""), "map_url": data.get("map_url",""), "image_url": data.get("image_url",""), "images": data.get("images", []), "status": data.get("status","to_try"), "notes": data.get("notes",""), "added_by": str(u["_id"]), "added_at": dt.datetime.utcnow(), "couple_id": cid}
     res = restaurants_col.insert_one(item); item["_id"]=str(res.inserted_id)
+    try:
+        payload = {'type': 'restaurant_created','title': '🍽️ Nouveau restaurant','body': f"{item['name']}",'url': '/restaurants'}
+        broadcast_push(cid, u['email'], payload)
+    except Exception as e:
+        if DEBUG_PUSH: print('[PUSH][RESTAURANT][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/restaurants/<rid>")
@@ -385,6 +396,11 @@ def activities_create(u, cid):
     data = request.get_json() or {}
     item = {"title": data["title"], "category": data.get("category","other"), "status": data.get("status","planned"), "notes": data.get("notes",""), "images": data.get("images", []), "image_url": data.get("image_url",""), "added_by": str(u["_id"]), "added_at": dt.datetime.utcnow(), "couple_id": cid}
     res = activities_col.insert_one(item); item["_id"]=str(res.inserted_id)
+    try:
+        payload = {'type': 'activity_created','title': '🎉 Nouvelle activité','body': f"{item['title']}",'url': '/'}
+        broadcast_push(cid, u['email'], payload)
+    except Exception as e:
+        if DEBUG_PUSH: print('[PUSH][ACTIVITY][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/activities/<aid>")
@@ -533,6 +549,14 @@ def photos_create():
                 created.append(serialize(item))
             except Exception as e:
                 print('upload error', e)
+        # Notification pour les photos uploadées
+        if created and cid:
+            try:
+                count = len(created)
+                payload = {'type': 'photo_uploaded','title': '📸 Nouvelles photos','body': f"{count} photo{'s' if count > 1 else ''} ajoutée{'s' if count > 1 else ''}",'url': '/photos'}
+                broadcast_push(cid, u['email'], payload)
+            except Exception as e:
+                if DEBUG_PUSH: print('[PUSH][PHOTO][ERROR]', e)
         return jsonify(created), 201
     data = request.get_json() or {}
     if not data.get('url'): return {"error":"missing_url"}, 400
@@ -629,6 +653,12 @@ def notes_create(u, cid):
     data = request.get_json() or {}
     item = {"content": data["content"], "pinned": bool(data.get("pinned", False)), "created_by": str(u["_id"]), "created_at": dt.datetime.utcnow(), "couple_id": cid}
     res = notes_col.insert_one(item); item["_id"]=str(res.inserted_id)
+    try:
+        preview = item['content'][:50] + ('...' if len(item['content']) > 50 else '')
+        payload = {'type': 'note_created','title': '📝 Nouvelle note','body': preview,'url': '/notes'}
+        broadcast_push(cid, u['email'], payload)
+    except Exception as e:
+        if DEBUG_PUSH: print('[PUSH][NOTE][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/notes/<nid>")
@@ -743,6 +773,68 @@ def broadcast_push(couple_id, author_email, payload: dict, exclude_author=True):
         ok, err = send_push(s.get('subscription', {}), payload)
         if not ok and err and ('410' in err or 'expired' in err.lower()):
             push_subs_col.delete_one({'_id': s['_id']})
+
+# ───────── Reminder Notifications Scheduler ─────────
+import threading
+import time
+
+def check_due_reminders():
+    """Vérifie les rappels arrivés à échéance et envoie des notifications"""
+    while True:
+        try:
+            time.sleep(60)  # Vérifier toutes les minutes
+            now = dt.datetime.utcnow()
+            # Chercher les rappels dus dans les prochaines 5 minutes qui n'ont pas été notifiés
+            due_soon = now + dt.timedelta(minutes=5)
+            reminders = list(reminders_col.find({
+                "status": "pending",
+                "due_date": {"$lte": due_soon, "$gte": now},
+                "notified": {"$ne": True}
+            }))
+            
+            for reminder in reminders:
+                try:
+                    cid = reminder.get('couple_id')
+                    if not cid:
+                        continue
+                    
+                    # Marquer comme notifié
+                    reminders_col.update_one({"_id": reminder["_id"]}, {"$set": {"notified": True}})
+                    
+                    # Envoyer notification
+                    priority = reminder.get('priority', 'normal')
+                    priority_emoji = '🔴' if priority == 'urgent' else ('🟠' if priority == 'important' else '🔵')
+                    
+                    payload = {
+                        'type': 'reminder_due',
+                        'title': f"{priority_emoji} Rappel à échéance !",
+                        'body': reminder.get('title', 'Rappel'),
+                        'url': '/reminders',
+                        'priority': priority,
+                        'requireInteraction': priority == 'urgent',
+                        'tag': f"reminder-{str(reminder['_id'])}"
+                    }
+                    
+                    # Envoyer à TOUS les membres du couple (pas d'exclusion)
+                    if webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY:
+                        subs = list(push_subs_col.find({"couple_id": cid}))
+                        for s in subs:
+                            ok, err = send_push(s.get('subscription', {}), payload)
+                            if not ok and err and ('410' in err or 'expired' in err.lower()):
+                                push_subs_col.delete_one({'_id': s['_id']})
+                    
+                    if DEBUG_PUSH:
+                        print(f'[PUSH][REMINDER_DUE] Sent for: {reminder.get("title")}')
+                except Exception as e:
+                    if DEBUG_PUSH:
+                        print(f'[PUSH][REMINDER_DUE][ERROR] {e}')
+        except Exception as e:
+            if DEBUG_PUSH:
+                print(f'[PUSH][CHECK_DUE_REMINDERS][ERROR] {e}')
+
+# Démarrer le thread de vérification des rappels en arrière-plan
+reminder_thread = threading.Thread(target=check_due_reminders, daemon=True)
+reminder_thread.start()
 
 # ───────── Entrypoint ─────────
 if __name__ == "__main__":

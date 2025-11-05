@@ -72,14 +72,29 @@ self.addEventListener('push', event => {
   let data = {};
   try { if (event.data) data = JSON.parse(event.data.text()); } catch(e) { data = { title: 'Notification', body: event.data && event.data.text() }; }
   let title = data.title || 'US';
+  
+  // Titres par défaut selon le type
   if (data.type === 'reminder_created' && !data.title) title = 'Nouveau rappel';
-  if (data.type === 'wishlist_created') title = 'Nouvel item wishlist';
+  if (data.type === 'reminder_due' && !data.title) title = 'Rappel à échéance !';
+  if (data.type === 'wishlist_created' && !data.title) title = 'Nouvel item wishlist';
+  if (data.type === 'restaurant_created' && !data.title) title = 'Nouveau restaurant';
+  if (data.type === 'activity_created' && !data.title) title = 'Nouvelle activité';
+  if (data.type === 'photo_uploaded' && !data.title) title = 'Nouvelles photos';
+  if (data.type === 'note_created' && !data.title) title = 'Nouvelle note';
+  
+  // Vibration selon la priorité
+  let vibrate = [80,40,80];
+  if (data.priority === 'urgent') vibrate = [200,100,200,100,200];
+  else if (data.priority === 'important') vibrate = [150,50,150];
+  
   const options = {
-    body: data.body || (data.type === 'wishlist_created' ? 'Nouvel item ajouté' : 'Nouvelle activité'),
+    body: data.body || 'Nouvelle activité',
     icon: '/favicon.ico',
     badge: '/favicon.ico',
     data,
-    vibrate: [80,40,80],
+    vibrate,
+    tag: data.tag || undefined,
+    requireInteraction: data.requireInteraction || false,
     actions: [
       { action: 'open', title: 'Ouvrir', icon: '/favicon.ico' },
       { action: 'close', title: 'Fermer', icon: '/favicon.ico' }

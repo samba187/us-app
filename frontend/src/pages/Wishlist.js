@@ -450,25 +450,6 @@ const FileUploadArea = styled.div`
     background: rgba(124, 58, 237, 0.08);
   }
 `;
-
-=======
-const FileUploadArea = styled.div`
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 30px 20px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-
-  &:hover {
-    border-color: var(--neon-1);
-    background: rgba(124, 58, 237, 0.08);
-  }
-`;
-
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 const FileInput = styled.input`
   position: absolute;
   opacity: 0;
