@@ -720,7 +720,6 @@ def send_push(subscription, payload: dict):
             subscription_info=subscription,
             data=data_str,
             vapid_private_key=VAPID_PRIVATE_KEY,
-            vapid_public_key=VAPID_PUBLIC_KEY,
             vapid_claims={"sub": VAPID_SUBJECT}
         )
         return True, None
