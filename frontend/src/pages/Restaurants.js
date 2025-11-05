@@ -335,6 +335,7 @@ const Select = styled.select`
     border-color: var(--neon-1);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
+<<<<<<< HEAD
 
   option {
     background: #1a1d2e;
@@ -346,6 +347,8 @@ const Select = styled.select`
     background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
     color: #fff;
   }
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 `;
 
 const SaveButton = styled.button`

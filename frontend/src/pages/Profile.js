@@ -1,6 +1,12 @@
+<<<<<<< HEAD
 import React, { useEffect, useMemo, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { FiMoon, FiSun, FiLogOut, FiUsers, FiImage, FiUpload, FiX, FiCheck } from 'react-icons/fi';
+=======
+import React, { useEffect, useState } from 'react';
+import styled, { keyframes } from 'styled-components';
+import { FiMoon, FiSun, FiLogOut, FiUsers } from 'react-icons/fi';
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 import NotificationSettings from '../components/NotificationSettings';
 import { authService } from '../services/authService';
 
@@ -86,6 +92,7 @@ const Select = styled.select`
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
   }
 
+<<<<<<< HEAD
   option {
     background: #1a1d2e;
     color: var(--text-color);
@@ -97,6 +104,8 @@ const Select = styled.select`
     color: #fff;
   }
 
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
   @media (max-width: 768px) {
     width: 100%;
   }
@@ -159,6 +168,7 @@ const CodeBadge = styled.code`
   font-size: 14px;
   letter-spacing: 1px;
 `;
+<<<<<<< HEAD
 
 const AvatarWrap = styled.div`
   display: flex;
@@ -218,6 +228,8 @@ const AvatarOption = styled.button`
   &:after{ content:''; position:absolute; inset:0; background:${({src})=>`url(${src}) center/cover no-repeat`}; }
   &.active { outline: 3px solid var(--neon-1); }
 `;
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 
 export default function Profile() {
   const [lang, setLang] = useState(localStorage.getItem('lang') || 'fr');
@@ -250,8 +262,11 @@ export default function Profile() {
       try {
         const r = await authService.api.get('/api/couple/me');
         setCouple(r.data);
+<<<<<<< HEAD
         const meRes = await authService.me.get();
         setMe(meRes);
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
       } catch (e) {
         console.error(e);
       }
@@ -313,6 +328,7 @@ export default function Profile() {
       <Title>Profil</Title>
 
       <Card>
+<<<<<<< HEAD
         <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
           <AvatarWrap>
             <Avatar src={absoluteUrl(me?.avatar_url)} />
@@ -367,6 +383,8 @@ export default function Profile() {
         </Modal>
       )}
       <Card>
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <FiUsers size={20} color="var(--neon-1)" />
           <LabelTitle>Couple</LabelTitle>

@@ -84,4 +84,8 @@ a { color: inherit; }
 @supports (backdrop-filter: blur(10px)) or (-webkit-backdrop-filter: blur(10px)) {
   .nav-glass { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
 }
+<<<<<<< HEAD
 .nav-indicator { position:absolute; bottom:6px; height:4px; width:calc(100%/6 - 16px); left:8px; border-radius: 999px; background: linear-gradient(90deg, var(--neon-2), var(--neon-3)); transition: transform .25s ease, left .25s ease, width .25s ease; box-shadow: 0 0 12px rgba(34,211,238,.55); }
+=======
+.nav-indicator { position:absolute; bottom:6px; height:4px; width:calc(100%/6 - 16px); left:8px; border-radius: 999px; background: linear-gradient(90deg, var(--neon-2), var(--neon-3)); transition: transform .25s ease; box-shadow: 0 0 12px rgba(34,211,238,.55); }
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc

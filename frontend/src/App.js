@@ -44,10 +44,15 @@ function AppShell({ children, path, navigate, me }) {
             <img src="/logo.svg" alt="US" width="28" height="28" style={{filter:'drop-shadow(0 0 10px rgba(124,58,237,.35))'}} />
             <div style={{fontWeight:700, letterSpacing:.3, color:'var(--text-color)'}}>{title}</div>
           </div>
+<<<<<<< HEAD
           <button onClick={()=>navigate('/profile')} style={{width:38, height:38, borderRadius:20, border:'1px solid var(--border-color)', background:'rgba(255,255,255,0.08)', color:'var(--text-color)', cursor:'pointer', overflow:'hidden'}} title="Profil">
             {avatarSrc ? (
               <img src={avatarSrc} alt="avatar" style={{width:'100%', height:'100%', objectFit:'cover'}} />
             ) : '🙂'}
+=======
+          <button onClick={()=>navigate('/profile')} style={{width:38, height:38, borderRadius:20, border:'1px solid var(--border-color)', background:'rgba(255,255,255,0.08)', color:'var(--text-color)', cursor:'pointer'}} title="Profil">
+            🙂
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
           </button>
         </div>
       </header>
@@ -77,7 +82,10 @@ function App() {
   const { path, navigate } = useHashRouter();
   const [authed, setAuthed] = useState(!!localStorage.getItem('access_token'));
   const [coupleStatus, setCoupleStatus] = useState(null);
+<<<<<<< HEAD
   const [me, setMe] = useState(null);
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
   
   useEffect(() => { authService.init(); }, []);
   useEffect(() => {
@@ -90,7 +98,10 @@ function App() {
       authService.api.get('/api/couple/me').then(r => {
         setCoupleStatus(r.data?.in_couple ? 'ok' : 'needs_onboarding');
       }).catch(() => setCoupleStatus('needs_onboarding'));
+<<<<<<< HEAD
       authService.api.get('/api/me').then(r => setMe(r.data)).catch(() => {});
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
     }
   }, [authed]);
   
@@ -100,7 +111,11 @@ function App() {
   
   return (
     <ErrorBoundary>
+<<<<<<< HEAD
       <AppShell path={path} navigate={navigate} me={me}>
+=======
+      <AppShell path={path} navigate={navigate}>
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
         <Router path={path} navigate={navigate} needsOnboarding={needsOnboarding} />
       </AppShell>
     </ErrorBoundary>

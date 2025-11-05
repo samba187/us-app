@@ -238,6 +238,7 @@ def get_me():
         return {"error": "unauth"}, 401
     return {"_id": str(u["_id"]), "name": u["name"], "email": u["email"], "avatar_url": u.get("avatar_url",""), "couple_id": str(u.get("couple_id")) if u.get("couple_id") else None}
 
+<<<<<<< HEAD
 @app.put("/api/me")
 @app.post("/api/me")
 @jwt_required()
@@ -269,6 +270,8 @@ def update_me():
         users_col.update_one({"_id": u["_id"]}, {"$set": fields})
     return {"msg": "updated"}
 
+=======
+>>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 @app.get("/api/couple/me")
 @jwt_required()
 def couple_me():
