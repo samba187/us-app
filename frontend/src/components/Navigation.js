@@ -8,21 +8,20 @@ const Bar = styled.nav`
   left: 0; right: 0; bottom: 0;
   background: transparent;
   border-top: 1px solid var(--border-color);
-<<<<<<< HEAD
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-=======
   display: flex;
   justify-content: space-around;
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
+  align-items: center;
   padding: 10px 8px 14px;
   z-index: 100;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
 `;
 
 const Item = styled.button`
   background: transparent;
   border: none;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -32,6 +31,20 @@ const Item = styled.button`
   gap: 4px;
   cursor: pointer;
   position: relative;
+  padding: 4px;
+  font-size: 11px;
+  
+  svg {
+    font-size: 20px;
+  }
+  
+  small {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
 `;
 
 export function Navigation({ current, onNavigate }) {
