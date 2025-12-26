@@ -26,8 +26,8 @@ const Title = styled.h1`
 `;
 
 const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);

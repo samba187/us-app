@@ -26,8 +26,8 @@ const Title = styled.h1`
 `;
 
 const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);
@@ -54,12 +54,12 @@ const Input = styled.input`
   color: var(--text-color);
   background: rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
+  font-family: inherit;
   transition: all 0.3s ease;
 
   &:focus {
     outline: none;
     border-color: var(--neon-1);
-    background: rgba(255, 255, 255, 0.06);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
 
@@ -85,7 +85,6 @@ const TextArea = styled.textarea`
   &:focus {
     outline: none;
     border-color: var(--neon-1);
-    background: rgba(255, 255, 255, 0.06);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
 
@@ -121,8 +120,6 @@ const Select = styled.select`
     border-color: var(--neon-1);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
-<<<<<<< HEAD
-
   option {
     background: #1a1d2e;
     color: var(--text-color);
@@ -133,8 +130,6 @@ const Select = styled.select`
     background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
     color: #fff;
   }
-=======
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 `;
 
 const Button = styled.button`
@@ -167,10 +162,10 @@ const ReminderCard = styled(Card)`
   display: flex;
   gap: 16px;
   align-items: flex-start;
-  border-left: 4px solid ${p => 
-    p.priority === 'urgent' ? '#e74c3c' : 
-    p.priority === 'important' ? '#f39c12' : 
-    '#3498db'
+  border-left: 4px solid ${p =>
+    p.priority === 'urgent' ? '#e74c3c' :
+      p.priority === 'important' ? '#f39c12' :
+        '#3498db'
   };
 `;
 
@@ -221,15 +216,15 @@ const Badge = styled.span`
   gap: 4px;
   padding: 4px 10px;
   border-radius: 12px;
-  background: ${p => 
-    p.type === 'urgent' ? 'rgba(231, 76, 60, 0.15)' : 
-    p.type === 'important' ? 'rgba(243, 156, 18, 0.15)' : 
-    'rgba(52, 152, 219, 0.15)'
+  background: ${p =>
+    p.type === 'urgent' ? 'rgba(231, 76, 60, 0.15)' :
+      p.type === 'important' ? 'rgba(243, 156, 18, 0.15)' :
+        'rgba(52, 152, 219, 0.15)'
   };
-  color: ${p => 
-    p.type === 'urgent' ? '#e74c3c' : 
-    p.type === 'important' ? '#f39c12' : 
-    '#3498db'
+  color: ${p =>
+    p.type === 'urgent' ? '#e74c3c' :
+      p.type === 'important' ? '#f39c12' :
+        '#3498db'
   };
   font-weight: 500;
 `;

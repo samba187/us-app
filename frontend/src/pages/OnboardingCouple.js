@@ -40,8 +40,8 @@ const Subtitle = styled.p`
 `;
 
 const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   padding: 28px 24px;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);

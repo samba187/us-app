@@ -70,8 +70,22 @@ export const authService = {
 			});
 			if (!res.ok) throw new Error('Upload failed');
 			return res.json();
+		},
+		async uploadGeneric(files) {
+			const fd = new FormData();
+			files.forEach(f => fd.append('files', f));
+			const token = getToken();
+			const res = await fetch(`${API_BASE}/api/upload`, {
+				method: 'POST',
+				headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+				body: fd
+			});
+			if (!res.ok) throw new Error('Upload generic failed');
+			const data = await res.json();
+			return data.files || [];
 		}
 	}
+
 };
 
 authService.init();

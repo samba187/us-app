@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import styled from 'styled-components';
-import { FiHome, FiList, FiBell, FiHeart, FiCamera, FiUser } from 'react-icons/fi';
+import { FiHome, FiList, FiBell, FiHeart, FiCamera, FiUser, FiClock } from 'react-icons/fi';
 import { MdRestaurant } from 'react-icons/md';
 
 const Bar = styled.nav`
@@ -48,7 +48,7 @@ const Item = styled.button`
 `;
 
 export function Navigation({ current, onNavigate }) {
-  const routes = useMemo(() => ['/', '/wishlist', '/reminders', '/restaurants', '/photos', '/notes'], []);
+  const routes = useMemo(() => ['/', '/wishlist', '/reminders', '/restaurants', '/photos', '/memories', '/notes'], []);
   // Déterminer l'index actif; si non trouvé, garder la première entrée
   const activeIndex = Math.max(0, routes.indexOf(current));
   const totalItems = routes.length;
@@ -80,7 +80,8 @@ export function Navigation({ current, onNavigate }) {
       <Item ref={el => (itemRefs.current[2] = el)} active={current==='/reminders'} onClick={() => onNavigate('/reminders')}> <FiBell /> <small>Rappels</small> </Item>
       <Item ref={el => (itemRefs.current[3] = el)} active={current==='/restaurants'} onClick={() => onNavigate('/restaurants')}> <MdRestaurant /> <small>Restos</small> </Item>
       <Item ref={el => (itemRefs.current[4] = el)} active={current==='/photos'} onClick={() => onNavigate('/photos')}> <FiCamera /> <small>Photos</small> </Item>
-      <Item ref={el => (itemRefs.current[5] = el)} active={current==='/notes'} onClick={() => onNavigate('/notes')}> <FiList /> <small>Notes</small> </Item>
+      <Item ref={el => (itemRefs.current[5] = el)} active={current==='/memories'} onClick={() => onNavigate('/memories')}> <FiClock /> <small>Souvenirs</small> </Item>
+      <Item ref={el => (itemRefs.current[6] = el)} active={current==='/notes'} onClick={() => onNavigate('/notes')}> <FiList /> <small>Notes</small> </Item>
     </Bar>
   );
 }

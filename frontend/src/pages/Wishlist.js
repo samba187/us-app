@@ -1,274 +1,258 @@
 import React, { useState, useEffect } from 'react';
-import styled, { keyframes } from 'styled-components';
-import { FiPlus, FiExternalLink, FiTrash2, FiEdit2, FiX, FiSave, FiImage, FiUpload } from 'react-icons/fi';
+import styled from 'styled-components';
+import { FiPlus, FiExternalLink, FiUpload } from 'react-icons/fi';
 import { authService } from '../services/authService';
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: none; }
-`;
-
 const Container = styled.div`
-  padding: 20px 16px;
-  max-width: 900px;
+  padding: 15px;
+  max-width: 800px;
   margin: 0 auto;
-  @media (max-width: 768px) { padding: 16px 12px; }
-`;
-
-const Title = styled.h1`
-  margin: 0 0 20px 0;
-  font-size: 28px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  
+  @media (max-width: 768px) {
+    padding: 10px;
+  }
 `;
 
 const Header = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-
+  margin-bottom: 20px;
+  gap: 10px;
+  
   @media (max-width: 768px) {
     flex-direction: column;
-    gap: 12px;
     align-items: stretch;
+    gap: 15px;
+  }
+`;
+
+const Title = styled.h1`
+  margin: 0;
+  color: var(--text-color);
+  font-size: 24px;
+  
+  @media (max-width: 768px) {
+    font-size: 20px;
+    text-align: center;
   }
 `;
 
 const AddButton = styled.button`
-  padding: 14px 28px;
+  background: var(--primary-color);
+  color: white;
   border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
-  color: #fff;
-  font-size: 16px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: inline-flex;
+  padding: 15px 25px;
+  border-radius: 25px;
+  display: flex;
   align-items: center;
-  gap: 10px;
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 16px;
+  min-height: 50px;
+  transition: all 0.2s;
+  white-space: nowrap;
 
   &:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 8px 28px rgba(124, 58, 237, 0.5);
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(0,0,0,0.2);
   }
-`;
-
-const Grid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 20px;
-
+  
   @media (max-width: 768px) {
-    grid-template-columns: 1fr;
+    width: 100%;
+    padding: 18px 25px;
+    font-size: 18px;
+    border-radius: 12px;
+    min-height: 56px;
   }
 `;
 
-const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
+const WishlistCard = styled.div`
+  background: var(--card-bg);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  margin-bottom: 18px;
   overflow: hidden;
-  box-shadow: 0 8px 28px rgba(0,0,0,0.2);
-  transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-  animation: ${fadeIn} 0.4s ease-out;
-  position: relative;
-
-  @supports (backdrop-filter: blur(12px)) {
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-  }
-
-  &:hover {
-    transform: translateY(-6px);
-    box-shadow: 0 12px 36px rgba(124, 58, 237, 0.3);
-    border-color: rgba(124, 58, 237, 0.4);
+  border: 1px solid var(--border-color);
+  transition: box-shadow .25s, transform .25s;
+  &.expanded {
+    box-shadow: 0 10px 28px rgba(0,0,0,0.12);
+    transform: translateY(-2px);
   }
 `;
 
 const WishlistImage = styled.div`
-  height: 240px;
-  background: ${({ image }) =>
-    image
-      ? `url(${image})`
-      : 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(255,107,138,0.4))'};
+  height: 140px;
+  background: ${({ image }) => {
+    if (image) {
+      const p = image.startsWith('http') ? image : (image.startsWith('/') ? image : `/${image}`);
+      return `url(${p})`;
+    }
+    return 'linear-gradient(135deg,#ddd,#bbb)';
+  }};
   background-size: cover;
   background-position: center;
   position: relative;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   cursor: pointer;
-  transition: all 0.3s ease;
-
-  &:hover {
-    transform: scale(1.03);
-  }
-
-  &::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 60%;
-    background: linear-gradient(to top, rgba(0,0,0,0.6), transparent);
-  }
-
-  &:hover::before {
-    content: "👁️ Voir en grand";
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(0,0,0,0.8);
-    color: #fff;
-    padding: 12px 24px;
-    border-radius: 12px;
-    font-size: 14px;
-    font-weight: 600;
-    z-index: 10;
-    backdrop-filter: blur(10px);
-  }
-`;
-
-const StatusBadge = styled.div`
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  padding: 8px 16px;
-  border-radius: 24px;
-  font-size: 13px;
-  font-weight: 600;
-  color: #fff;
-  z-index: 2;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  background: ${p =>
-    p.status === 'gifted' ? 'rgba(16, 185, 129, 0.85)' :
-    p.status === 'bought' ? 'rgba(243, 156, 18, 0.85)' :
-    'rgba(52, 152, 219, 0.85)'
-  };
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
 `;
 
 const WishlistContent = styled.div`
-  padding: 20px;
+  padding: 18px 20px 20px;
 `;
 
 const WishlistTitle = styled.h3`
   margin: 0 0 8px 0;
-  font-size: 20px;
-  font-weight: 700;
   color: var(--text-color);
-  line-height: 1.3;
+  font-size: 18px;
 `;
 
-const ForUser = styled.div`
-  color: var(--neon-3);
-  font-size: 13px;
-  margin: 0 0 12px 0;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-`;
-
-const Description = styled.p`
-  color: var(--muted-text);
+const ForUser = styled.p`
+  color: var(--primary-color);
   font-size: 14px;
-  line-height: 1.6;
-  margin: 0 0 16px 0;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  margin: 0 0 12px 0;
+  font-weight: 500;
 `;
 
-const Actions = styled.div`
+const WishlistDescription = styled.p`
+  color: var(--text-color);
+  font-size: 14px;
+  line-height: 1.4;
+  margin: 0 0 14px;
+`;
+
+const StatusBadge = styled.div`
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+  background: ${props => {
+    switch (props.status) {
+      case 'idea': return '#3498db';
+      case 'bought': return '#e74c3c';
+      case 'gifted': return '#27ae60';
+      default: return '#95a5a6';
+    }
+  }};
+`;
+
+const ToggleDetails = styled.button`
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border-radius: 14px;
+  cursor: pointer;
+  letter-spacing: .5px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const GalleryBadge = styled.button`
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 6px 10px;
+  font-size: 11px;
+  border: none;
+  background: rgba(0,0,0,0.55);
+  color: #fff;
+  border-radius: 14px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+`;
+
+const WishlistActions = styled.div`
   display: flex;
   gap: 8px;
+  margin-bottom: 15px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
 `;
 
 const ActionButton = styled.button`
-  padding: 8px 14px;
-  border: 2px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-color);
-  border-radius: 12px;
+  padding: 8px 16px;
+  border: 2px solid var(--border-color);
+  background: white;
+  border-radius: 20px;
   cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-
-  &:hover {
-    border-color: var(--neon-1);
-    background: rgba(124, 58, 237, 0.15);
-    transform: translateY(-1px);
-  }
+  font-size: 14px;
+  transition: all 0.2s;
 
   &.active {
-    border-color: var(--neon-1);
-    background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
-    color: #fff;
+    background: var(--primary-color);
+    color: white;
+    border-color: var(--primary-color);
+  }
+
+  &:hover {
+    border-color: var(--primary-color);
   }
 `;
 
-const ButtonRow = styled.div`
+const LinkButton = styled.a`
+  padding: 8px 16px;
+  border: 2px solid var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+  border-radius: 20px;
+  text-decoration: none;
+  font-size: 14px;
   display: flex;
-  gap: 8px;
-  padding-top: 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  align-items: center;
+  gap: 5px;
+  transition: all 0.2s;
+
+  &:hover {
+    opacity: 0.8;
+  }
+`;
+
+const EditDeleteRow = styled.div`
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
 `;
 
 const EditButton = styled.button`
   flex: 1;
   padding: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  background: white;
   color: var(--text-color);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
 
   &:hover {
-    border-color: var(--neon-1);
-    background: rgba(124, 58, 237, 0.15);
+    background: #f8f9fa;
   }
 `;
 
 const DeleteButton = styled.button`
   flex: 1;
   padding: 10px;
-  border: 1px solid rgba(231, 76, 60, 0.5);
-  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid #e74c3c;
+  background: white;
   color: #e74c3c;
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
   font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
 
   &:hover {
-    border-color: #e74c3c;
-    background: rgba(231, 76, 60, 0.2);
+    background: #e74c3c;
+    color: white;
   }
 `;
 
@@ -278,44 +262,46 @@ const Modal = styled.div`
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.85);
+  background: rgba(0,0,0,0.8);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 20px;
-
+  
   @media (max-width: 768px) {
+    padding: 10px;
     align-items: flex-start;
     padding-top: 20px;
   }
 `;
 
 const ModalContent = styled.div`
-  background: rgba(15, 18, 33, 0.98);
+  background: rgba(15, 18, 33, 0.95);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 20px;
+  border-radius: 18px;
   padding: 28px;
   width: 100%;
   max-width: 600px;
   max-height: 90vh;
   overflow-y: auto;
 
-  @supports (backdrop-filter: blur(16px)) {
-    backdrop-filter: blur(16px);
-    -webkit-backdrop-filter: blur(16px);
+  @supports (backdrop-filter: blur(14px)) {
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+  
+  @media (max-width: 768px) {
+    padding: 16px;
+    border-radius: 12px;
+    max-height: 95vh;
+    max-width: 95vw;
+    margin: 0 auto;
   }
 `;
 
-const ModalHeader = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-`;
-
 const ModalTitle = styled.h2`
-  margin: 0;
+  margin: 0 0 24px 0;
   font-size: 24px;
   font-weight: 700;
   background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
@@ -324,28 +310,43 @@ const ModalTitle = styled.h2`
   background-clip: text;
 `;
 
-const CloseButton = styled.button`
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-color);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
+const FormGroup = styled.div`
+  margin-bottom: 20px;
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.15);
-    transform: rotate(90deg);
+  @media (max-width: 768px) {
+    margin-bottom: 16px;
   }
 `;
 
-const FormGrid = styled.div`
-  display: grid;
-  gap: 16px;
+const Label = styled.label`
+  display: block;
+  margin-bottom: 8px;
+  color: var(--text-color);
+  font-weight: 500;
+`;
+
+const HiddenInput = styled.input`
+  display: none;
+`;
+
+const FileInputLabel = styled.label`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-color);
+  text-align: center;
+
+  &:hover {
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.08);
+  }
 `;
 
 const Input = styled.input`
@@ -357,12 +358,11 @@ const Input = styled.input`
   color: var(--text-color);
   background: rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
-  transition: all 0.3s ease;
-
+  font-family: inherit;
+  
   &:focus {
     outline: none;
     border-color: var(--neon-1);
-    background: rgba(255, 255, 255, 0.06);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
 
@@ -383,12 +383,10 @@ const TextArea = styled.textarea`
   min-height: 100px;
   resize: vertical;
   font-family: inherit;
-  transition: all 0.3s ease;
-
+  
   &:focus {
     outline: none;
     border-color: var(--neon-1);
-    background: rgba(255, 255, 255, 0.06);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
 
@@ -406,23 +404,15 @@ const Select = styled.select`
   color: var(--text-color);
   background: rgba(255, 255, 255, 0.04);
   box-sizing: border-box;
+  font-family: inherit;
   cursor: pointer;
-  transition: all 0.3s ease;
-
+  
   &:focus {
     outline: none;
     border-color: var(--neon-1);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
-<<<<<<< HEAD
-=======
   }
 
-  option {
-    background: #1a1d2e;
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
-  }
-
-<<<<<<< HEAD
   option {
     background: #1a1d2e;
     color: var(--text-color);
@@ -435,430 +425,325 @@ const Select = styled.select`
   }
 `;
 
-const FileUploadArea = styled.div`
-  border: 2px dashed rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  padding: 30px 20px;
-  text-align: center;
-  background: rgba(255, 255, 255, 0.02);
-  cursor: pointer;
-  transition: all 0.3s ease;
-  position: relative;
-
-  &:hover {
-    border-color: var(--neon-1);
-    background: rgba(124, 58, 237, 0.08);
-  }
-`;
-const FileInput = styled.input`
-  position: absolute;
-  opacity: 0;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  cursor: pointer;
-`;
-
-const ImagePreview = styled.div`
-  margin-top: 12px;
-  border-radius: 12px;
-  overflow: hidden;
-  position: relative;
-  max-height: 200px;
-
-  img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-`;
-
-const RemoveImageBtn = styled.button`
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(231, 76, 60, 0.9);
-  color: #fff;
-  cursor: pointer;
+const ModalActions = styled.div`
   display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-
-  &:hover {
-    background: #e74c3c;
-    transform: scale(1.1);
-  }
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 30px;
 `;
 
-const SaveButton = styled.button`
-  width: 100%;
-  padding: 16px;
+const ModalButton = styled.button`
+  padding: 14px 24px;
   border: none;
-  border-radius: 14px;
-  background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
-  color: #fff;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+  gap: 8px;
   transition: all 0.3s ease;
+  min-height: 48px;
 
-  &:hover:not(:disabled) {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 28px rgba(124, 58, 237, 0.5);
+  &.primary {
+    background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
+    color: #fff;
+    box-shadow: 0 4px 16px rgba(124, 58, 237, 0.3);
+
+    &:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
+    }
   }
+  
+  &.secondary {
+    background: transparent;
+    color: var(--text-color);
+    border: 1px solid var(--border-color);
 
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+    &:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+  }
+  
+  @media (max-width: 768px) {
+    flex: 1;
+    padding: 16px;
+    font-size: 16px;
+    min-height: 48px;
   }
 `;
 
-const EmptyState = styled.div`
-  text-align: center;
-  padding: 80px 20px;
-  color: var(--muted-text);
+const ImagePreview = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
 `;
 
-const ViewModal = styled.div`
+const PreviewImage = styled.div`
+  width: 80px;
+  height: 80px;
+  background-image: url(${props => props.src});
+  background-size: cover;
+  background-position: center;
+  border-radius: 8px;
+  position: relative;
+`;
+
+const RemoveImageButton = styled.button`
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: #e74c3c;
+  color: white;
+  cursor: pointer;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`;
+
+const ImageGallery = styled.div`
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0,0,0,0.95);
+  background: rgba(0,0,0,0.9);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 2000;
-  padding: 20px;
-  animation: ${fadeIn} 0.3s ease-out;
-
-  @media (max-width: 768px) {
-    padding: 0;
-    align-items: flex-start;
-  }
 `;
 
-const ViewContent = styled.div`
-  background: rgba(15, 18, 33, 0.98);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 24px;
-  width: 100%;
-  max-width: 800px;
-  max-height: 90vh;
-  overflow-y: auto;
-
-  @supports (backdrop-filter: blur(20px)) {
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-  }
-
-  @media (max-width: 768px) {
-    border-radius: 0;
-    max-height: 100vh;
-    height: 100vh;
-  }
+const GalleryImage = styled.img`
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
 `;
 
-const ViewImageLarge = styled.div`
-  width: 100%;
-  height: 600px;
-  background: ${({ image }) =>
-    image
-      ? `url(${image})`
-      : 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(255,107,138,0.4))'};
-  background-size: contain;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-color: rgba(0,0,0,0.3);
-  position: relative;
-  border-radius: 24px 24px 0 0;
-
-  @media (max-width: 768px) {
-    height: 60vh;
-    border-radius: 0;
-  }
+const GalleryControls = styled.div`
+  position: absolute;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 10px;
 `;
 
-const ViewCloseButton = styled.button`
+const GalleryButton = styled.button`
+  padding: 10px 20px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+`;
+
+const CloseButton = styled.button`
   position: absolute;
   top: 20px;
   right: 20px;
-  width: 44px;
-  height: 44px;
+  background: rgba(255,255,255,0.2);
+  color: white;
+  border: none;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  backdrop-filter: blur(10px);
-  z-index: 10;
-
-  &:hover {
-    background: rgba(0, 0, 0, 0.9);
-    transform: scale(1.1);
-  }
+  font-size: 20px;
 `;
 
-const ViewDetails = styled.div`
-  padding: 32px;
-
-  @media (max-width: 768px) {
-    padding: 24px 20px;
-  }
-`;
-
-const ViewTitle = styled.h2`
-  margin: 0 0 12px 0;
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--text-color);
-  line-height: 1.2;
-
-  @media (max-width: 768px) {
-    font-size: 24px;
-  }
-`;
-
-const ViewMeta = styled.div`
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-`;
-
-const ViewBadge = styled.div`
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-  background: ${p =>
-    p.type === 'status' && p.status === 'gifted' ? 'rgba(16, 185, 129, 0.2)' :
-    p.type === 'status' && p.status === 'bought' ? 'rgba(243, 156, 18, 0.2)' :
-    p.type === 'status' ? 'rgba(52, 152, 219, 0.2)' :
-    'rgba(255, 107, 138, 0.2)'
-  };
-  color: ${p =>
-    p.type === 'status' && p.status === 'gifted' ? '#10b981' :
-    p.type === 'status' && p.status === 'bought' ? '#f39c12' :
-    p.type === 'status' ? '#3498db' :
-    'var(--neon-3)'
-  };
-  border: 1px solid ${p =>
-    p.type === 'status' && p.status === 'gifted' ? 'rgba(16, 185, 129, 0.3)' :
-    p.type === 'status' && p.status === 'bought' ? 'rgba(243, 156, 18, 0.3)' :
-    p.type === 'status' ? 'rgba(52, 152, 219, 0.3)' :
-    'rgba(255, 107, 138, 0.3)'
-  };
-`;
-
-const ViewDescription = styled.div`
-  color: var(--text-color);
-  font-size: 16px;
-  line-height: 1.8;
-  margin-bottom: 24px;
-  white-space: pre-wrap;
-`;
-
-const ViewActions = styled.div`
-  display: flex;
-  gap: 12px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-
-  @media (max-width: 768px) {
-    flex-direction: column;
-  }
-`;
-
-const ViewActionButton = styled.button`
-  flex: 1;
-  padding: 14px 20px;
-  border: none;
-  border-radius: 12px;
-  background: ${p => p.variant === 'primary' 
-    ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))'
-    : 'rgba(255, 255, 255, 0.06)'
-  };
-  color: #fff;
-  font-size: 15px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(124, 58, 237, 0.4);
-  }
-`;
-
-export default function Wishlist() {
-  const [items, setItems] = useState([]);
+function Wishlist() {
+  const [wishlist, setWishlist] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({
+  const [editingItem, setEditingItem] = useState(null);
+  const [viewingImages, setViewingImages] = useState(null);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [expanded, setExpanded] = useState({}); // id -> bool
+  const [couples, setCouples] = useState([]);
+  const [existingImages, setExistingImages] = useState([]);
+  const [formData, setFormData] = useState({
     title: '',
     description: '',
     link_url: '',
-    image_url: '',
-    for_user: '', // will be user_id
+    recipient_id: '',
     status: 'idea'
   });
-  const [imageFile, setImageFile] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const [uploading, setUploading] = useState(false);
-  const [viewingItem, setViewingItem] = useState(null);
-  const [coupleInfo, setCoupleInfo] = useState(null);
-  const [currentUserId, setCurrentUserId] = useState(null);
+  const [selectedImages, setSelectedImages] = useState([]);
+  const [imageFiles, setImageFiles] = useState([]);
 
   useEffect(() => {
-    loadCoupleInfo();
-    load();
+    loadWishlist();
+    loadCouples();
   }, []);
 
-  const loadCoupleInfo = async () => {
+  const loadWishlist = async () => {
     try {
-      const [meRes, coupleRes] = await Promise.all([
-        authService.api.get('/api/me'),
-        authService.api.get('/api/couple/me')
-      ]);
-      setCurrentUserId(meRes.data._id);
-      setCoupleInfo(coupleRes.data);
-    } catch (e) {
-      console.error(e);
+      const response = await authService.api.get('/api/wishlist');
+      setWishlist(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement de la wishlist:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const load = async () => {
+  const loadCouples = async () => {
     try {
-      const r = await authService.api.get('/api/wishlist');
-      setItems(r.data);
-    } catch (e) {
-      console.error(e);
+      const response = await authService.api.get('/api/couples');
+      setCouples(response.data);
+    } catch (error) {
+      console.error('Erreur lors du chargement des couples:', error);
+      // Pas de couples = pas grave, on peut quand même utiliser "Moi"
+      setCouples([]);
     }
-    setLoading(false);
   };
 
-  const openModal = (item = null) => {
-    if (item) {
-      setEditing(item._id);
-      setForm({
-        title: item.title || '',
-        description: item.description || '',
-        link_url: item.link_url || '',
-        for_user: item.for_user || 'me',
-        image_url: item.image_url || '',
-        status: item.status || 'idea'
-      });
-      if (getImageUrl(item)) {
-        setImagePreview(getImageUrl(item));
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.title.trim()) {
+      alert('Le titre est obligatoire');
+      return;
+    }
+
+    try {
+      let uploadedImages = [];
+
+      if (imageFiles.length > 0) {
+        // Use generic upload to get URLs directly
+        const urls = await authService.photoService.uploadGeneric(imageFiles);
+        uploadedImages = urls.map(url => ({ url, _id: url })); // Treat URL as ID for compatibility
       }
-    } else {
-      setEditing(null);
-      setForm({ title: '', description: '', link_url: '', image_url: '', for_user: currentUserId || '', status: 'idea' });
-      setImageFile(null);
-      setImagePreview(null);
+
+      // Combiner pour déterminer l'image de couverture
+      const allImageObjects = [
+        ...existingImages.map(img => (typeof img === 'string' ? { url: img, _id: img } : img)),
+        ...uploadedImages
+      ];
+
+      let newCoverUrl = formData.image_url || ''; // Garder l'ancienne si pas de changement
+      if (allImageObjects.length > 0) {
+        newCoverUrl = allImageObjects[0].url;
+      } else {
+        newCoverUrl = ''; // Plus d'images
+      }
+
+      const wishlistData = {
+        title: formData.title,
+        description: formData.description,
+        link_url: formData.link_url,
+        recipient_id: formData.recipient_id,
+        status: formData.status,
+        image_url: newCoverUrl,
+        images: [
+          ...existingImages.map(img => (typeof img === 'string' ? img : img._id)),
+          ...uploadedImages.map(img => img.url) // Store URL directly
+        ]
+      };
+
+      console.log('Sending wishlist data:', wishlistData);
+
+      if (editingItem) {
+        await authService.api.put(`/api/wishlist/${editingItem._id}`, wishlistData);
+      } else {
+        await authService.api.post('/api/wishlist', wishlistData);
+      }
+
+
+      console.log('Wishlist item saved successfully');
+      await loadWishlist();
+      handleCloseModal();
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde:', error);
+      alert('Erreur lors de la sauvegarde: ' + (error.response?.data?.message || error.message));
     }
+  };
+
+  const handleCloseModal = () => {
+    setShowModal(false);
+    setEditingItem(null);
+    setExistingImages([]);
+    setFormData({
+      title: '',
+      description: '',
+      link_url: '',
+      recipient_id: '',
+      status: 'idea'
+    });
+    setSelectedImages([]);
+    setImageFiles([]);
+  };
+
+  const handleEdit = (item) => {
+    setEditingItem(item);
+
+    // Fix legacy: si images est vide mais image_url existe, on l'ajoute
+    let initialImages = item.images || [];
+    if (initialImages.length === 0 && item.image_url) {
+      initialImages = [item.image_url];
+    }
+
+    setExistingImages(initialImages);
+    setFormData({
+      title: item.title,
+      description: item.description || '',
+      link_url: item.link_url || '',
+      recipient_id: item.recipient_id || '',
+      status: item.status,
+      image_url: item.image_url // Keep track of original image_url
+    });
     setShowModal(true);
   };
 
-  const closeModal = () => {
-    setShowModal(false);
-    setEditing(null);
-    setImageFile(null);
-    setImagePreview(null);
-  };
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setImageFile(file);
-      const reader = new FileReader();
-      reader.onload = (e) => setImagePreview(e.target.result);
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const removeImage = () => {
-    setImageFile(null);
-    setImagePreview(null);
-    setForm({ ...form, image_url: '' });
-  };
-
-  const save = async () => {
-    if (!form.title.trim()) return;
-    setUploading(true);
-    
-    try {
-      let finalImageUrl = form.image_url;
-      
-      // Upload image si fichier sélectionné
-      if (imageFile) {
-        console.log('Uploading image file...');
-        const uploaded = await authService.photoService.uploadMultipart([imageFile]);
-        console.log('Upload response:', uploaded);
-        if (uploaded && uploaded[0]) {
-          // L'API retourne { url: "/uploads/xxx.jpg" }
-          finalImageUrl = uploaded[0].url;
-          console.log('Final image URL:', finalImageUrl);
-        }
+  const handleDelete = async (id) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer cet élément ?')) {
+      try {
+        await authService.api.delete(`/api/wishlist/${id}`);
+        await loadWishlist();
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
       }
-
-      const payload = { ...form, image_url: finalImageUrl };
-      console.log('Saving wishlist item with payload:', payload);
-
-      if (editing) {
-        await authService.api.put(`/api/wishlist/${editing}`, payload);
-      } else {
-        await authService.api.post('/api/wishlist', payload);
-      }
-      
-      closeModal();
-      await load();
-    } catch (e) {
-      console.error('Save error:', e);
-      alert('Erreur: ' + (e?.response?.data?.error || e.message));
     }
-    setUploading(false);
   };
 
   const updateStatus = async (id, status) => {
     try {
       await authService.api.put(`/api/wishlist/${id}`, { status });
-      await load();
-    } catch (e) {
-      console.error(e);
+      await loadWishlist();
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du statut:', error);
     }
   };
 
-  const remove = async (id) => {
-    if (!window.confirm('Supprimer cet élément ?')) return;
-    try {
-      await authService.api.delete(`/api/wishlist/${id}`);
-      await load();
-    } catch (e) {
-      console.error(e);
-    }
+  const handleFileSelect = (e) => {
+    const files = Array.from(e.target.files);
+    setImageFiles(prev => [...prev, ...files]);
+
+    files.forEach(file => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setSelectedImages(prev => [...prev, e.target.result]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeImage = (index) => {
+    setSelectedImages(prev => prev.filter((_, i) => i !== index));
+    setImageFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const removeExistingImage = (index) => {
+    setExistingImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const getStatusLabel = (status) => {
@@ -866,267 +751,243 @@ export default function Wishlist() {
       case 'idea': return 'Idée';
       case 'bought': return 'Acheté';
       case 'gifted': return 'Offert';
-      default: return status;
+      default: return 'Idée';
     }
   };
 
-  const getForUserLabel = (for_user_id) => {
-    if (!coupleInfo || !for_user_id) return '🎁 Non défini';
-    
-    if (for_user_id === 'both') return '💑 Pour nous deux';
-    
-    // Chercher le nom dans les membres du couple
-    const member = coupleInfo.members?.find(m => m._id === for_user_id);
-    if (member) {
-      if (member._id === currentUserId) {
-        return `🎁 Pour ${member.name}`;
-      } else {
-        return `💝 Pour ${member.name}`;
-      }
+  const getUserName = (item) => {
+    if (!item.recipient_id) return 'Moi';
+    const couple = couples.find(c => c._id === item.recipient_id);
+    return couple ? couple.name : 'Inconnu';
+  };
+
+  const getImageUrl = (image) => {
+    if (typeof image === 'string') {
+      return image.startsWith('http') ? image : `/uploads/${image}`;
     }
-    
-    return '🎁 Non défini';
+    return image?.filename ? `/uploads/${image.filename}` : null;
   };
 
-  const getPartnerName = () => {
-    if (!coupleInfo || !currentUserId) return 'Partenaire';
-    const partner = coupleInfo.members?.find(m => m._id !== currentUserId);
-    return partner?.name || 'Partenaire';
-  };
-
-  const getMyName = () => {
-    if (!coupleInfo || !currentUserId) return 'Moi';
-    const me = coupleInfo.members?.find(m => m._id === currentUserId);
-    return me?.name || 'Moi';
-  };
-
-  const getImageUrl = (item) => {
-    const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
-    
-    let url = null;
-    if (item.image_url) {
-      url = item.image_url;
-    } else if (item.images && item.images[0]) {
-      const img = item.images[0];
-      if (typeof img === 'string') url = img;
-      else if (img.url) url = img.url;
-    }
-    
-    console.log('getImageUrl - item:', item.title, 'url:', url);
-    
-    if (!url) return null;
-    if (url.startsWith('http')) return url;
-    
-    // Si URL relative, ajouter le préfixe API
-    const fullUrl = url.startsWith('/') ? `${API_BASE}${url}` : `${API_BASE}/${url}`;
-    console.log('getImageUrl - full URL:', fullUrl);
-    return fullUrl;
-  };
+  if (loading) {
+    return <Container>Chargement...</Container>;
+  }
 
   return (
     <Container>
       <Header>
         <Title>Wishlist</Title>
-        <AddButton onClick={() => openModal()}>
-          <FiPlus size={20} /> Ajouter
+        <AddButton onClick={() => setShowModal(true)}>
+          <FiPlus /> Ajouter
         </AddButton>
       </Header>
 
-      {loading ? (
-        <Grid>
-          <div className="skeleton" style={{ height: 400, borderRadius: 20 }} />
-          <div className="skeleton" style={{ height: 400, borderRadius: 20 }} />
-        </Grid>
-      ) : items.length === 0 ? (
-        <EmptyState>
-          <div style={{ fontSize: 64, marginBottom: 16 }}>🎁</div>
-          <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 10 }}>Votre wishlist est vide</div>
-          <div style={{ marginBottom: 24 }}>Ajoutez vos idées cadeaux pour vous ou votre partenaire</div>
-          <AddButton onClick={() => openModal()}>
-            <FiPlus size={20} /> Ajouter un premier élément
-          </AddButton>
-        </EmptyState>
-      ) : (
-        <Grid>
-          {items.map(item => (
-            <Card key={item._id}>
-              <WishlistImage 
-                image={getImageUrl(item)}
-                onClick={() => setViewingItem(item)}
-              >
-                <StatusBadge status={item.status}>
-                  {getStatusLabel(item.status)}
-                </StatusBadge>
-              </WishlistImage>
+      {wishlist.map((item) => {
+        const isExpanded = !!expanded[item._id];
+        const cover = item.image_url || (item.images && item.images[0] && getImageUrl(item.images[0]));
+        return (
+          <WishlistCard key={item._id} className={isExpanded ? 'expanded' : ''}>
+            <WishlistImage
+              image={cover}
+              onClick={() => setExpanded(prev => ({ ...prev, [item._id]: !prev[item._id] }))}
+            >
+              <StatusBadge status={item.status}>{getStatusLabel(item.status)}</StatusBadge>
+              {item.images && item.images.length > 1 && (
+                <GalleryBadge
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentImageIndex(0);
+                    setViewingImages(item);
+                  }}
+                >📷 {item.images.length}</GalleryBadge>
+              )}
+              {!cover && <ToggleDetails onClick={(e) => { e.stopPropagation(); setExpanded(p => ({ ...p, [item._id]: !p[item._id] })); }}>Détails</ToggleDetails>}
+            </WishlistImage>
+            {isExpanded && (
               <WishlistContent>
                 <WishlistTitle>{item.title}</WishlistTitle>
-                <ForUser>{getForUserLabel(item.for_user)}</ForUser>
-                {item.description && <Description>{item.description}</Description>}
-                <Actions>
+                <ForUser>Pour {getUserName(item)}</ForUser>
+                {item.description && (
+                  <WishlistDescription>{item.description}</WishlistDescription>
+                )}
+                <WishlistActions>
                   <ActionButton
                     className={item.status === 'idea' ? 'active' : ''}
                     onClick={() => updateStatus(item._id, 'idea')}
-                  >
-                    Idée
-                  </ActionButton>
+                  >Idée</ActionButton>
                   <ActionButton
                     className={item.status === 'bought' ? 'active' : ''}
                     onClick={() => updateStatus(item._id, 'bought')}
-                  >
-                    Acheté
-                  </ActionButton>
+                  >Acheté</ActionButton>
                   <ActionButton
                     className={item.status === 'gifted' ? 'active' : ''}
                     onClick={() => updateStatus(item._id, 'gifted')}
-                  >
-                    Offert
-                  </ActionButton>
+                  >Offert</ActionButton>
                   {item.link_url && (
-                    <ActionButton as="a" href={item.link_url} target="_blank" rel="noopener noreferrer">
-                      <FiExternalLink /> Lien
-                    </ActionButton>
+                    <LinkButton href={item.link_url} target="_blank" rel="noopener noreferrer">
+                      <FiExternalLink /> Voir
+                    </LinkButton>
                   )}
-                </Actions>
-                <ButtonRow>
-                  <EditButton onClick={() => openModal(item)}>
-                    <FiEdit2 /> Modifier
-                  </EditButton>
-                  <DeleteButton onClick={() => remove(item._id)}>
-                    <FiTrash2 /> Supprimer
-                  </DeleteButton>
-                </ButtonRow>
+                </WishlistActions>
+                <EditDeleteRow>
+                  <EditButton onClick={() => handleEdit(item)}>Modifier</EditButton>
+                  <DeleteButton onClick={() => handleDelete(item._id)}>Supprimer</DeleteButton>
+                </EditDeleteRow>
               </WishlistContent>
-            </Card>
-          ))}
-        </Grid>
-      )}
-
-      {viewingItem && (
-        <ViewModal onClick={(e) => e.target === e.currentTarget && setViewingItem(null)}>
-          <ViewContent>
-            <ViewImageLarge image={getImageUrl(viewingItem)}>
-              <ViewCloseButton onClick={() => setViewingItem(null)}>
-                <FiX size={24} />
-              </ViewCloseButton>
-            </ViewImageLarge>
-            <ViewDetails>
-              <ViewTitle>{viewingItem.title}</ViewTitle>
-              <ViewMeta>
-                <ViewBadge type="status" status={viewingItem.status}>
-                  {getStatusLabel(viewingItem.status)}
-                </ViewBadge>
-                <ViewBadge type="recipient">
-                  {getForUserLabel(viewingItem.for_user)}
-                </ViewBadge>
-              </ViewMeta>
-              {viewingItem.description && (
-                <ViewDescription>{viewingItem.description}</ViewDescription>
-              )}
-              <ViewActions>
-                {viewingItem.link_url && (
-                  <ViewActionButton 
-                    as="a" 
-                    href={viewingItem.link_url} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    variant="primary"
-                  >
-                    <FiExternalLink /> Voir le lien
-                  </ViewActionButton>
-                )}
-                <ViewActionButton onClick={() => { setViewingItem(null); openModal(viewingItem); }}>
-                  <FiEdit2 /> Modifier
-                </ViewActionButton>
-                <ViewActionButton onClick={() => { setViewingItem(null); remove(viewingItem._id); }}>
-                  <FiTrash2 /> Supprimer
-                </ViewActionButton>
-              </ViewActions>
-            </ViewDetails>
-          </ViewContent>
-        </ViewModal>
-      )}
+            )}
+          </WishlistCard>
+        );
+      })}
 
       {showModal && (
-        <Modal onClick={(e) => e.target === e.currentTarget && closeModal()}>
+        <Modal onClick={(e) => e.target === e.currentTarget && handleCloseModal()}>
           <ModalContent>
-            <ModalHeader>
-              <ModalTitle>{editing ? 'Modifier' : 'Ajouter'}</ModalTitle>
-              <CloseButton onClick={closeModal}>
-                <FiX size={20} />
-              </CloseButton>
-            </ModalHeader>
-            <FormGrid>
-              <Input
-                placeholder="Titre *"
-                value={form.title}
-                onChange={e => setForm({ ...form, title: e.target.value })}
-              />
-              <TextArea
-                placeholder="Description, détails..."
-                value={form.description}
-                onChange={e => setForm({ ...form, description: e.target.value })}
-              />
-              
-              <FileUploadArea>
-                <FileInput
-                  type="file"
-                  accept="image/*"
-                  onChange={handleImageSelect}
-                />
-                {imagePreview ? (
-                  <ImagePreview>
-                    <img src={imagePreview} alt="Preview" />
-                    <RemoveImageBtn onClick={(e) => { e.stopPropagation(); removeImage(); }}>
-                      <FiX />
-                    </RemoveImageBtn>
-                  </ImagePreview>
-                ) : (
-                  <>
-                    <FiUpload size={32} style={{ marginBottom: 8, opacity: 0.6 }} />
-                    <div style={{ fontSize: 15, fontWeight: 600, marginBottom: 4 }}>
-                      Cliquez pour ajouter une photo
-                    </div>
-                    <div style={{ fontSize: 13, opacity: 0.7 }}>
-                      ou collez une URL ci-dessous
-                    </div>
-                  </>
-                )}
-              </FileUploadArea>
+            <ModalTitle>{editingItem ? 'Modifier' : 'Ajouter'} un élément</ModalTitle>
 
-              <Input
-                placeholder="URL de l'image (optionnel)"
-                value={form.image_url}
-                onChange={e => setForm({ ...form, image_url: e.target.value })}
-              />
-              
-              <Input
-                placeholder="Lien produit (https://...)"
-                value={form.link_url}
-                onChange={e => setForm({ ...form, link_url: e.target.value })}
-              />
-              
-              <Select value={form.for_user} onChange={e => setForm({ ...form, for_user: e.target.value })}>
-                <option value="">Choisir...</option>
-                {currentUserId && <option value={currentUserId}>🎁 Pour {getMyName()}</option>}
-                {coupleInfo?.members?.filter(m => m._id !== currentUserId).map(partner => (
-                  <option key={partner._id} value={partner._id}>💝 Pour {partner.name}</option>
-                ))}
-                <option value="both">💑 Pour nous deux</option>
-              </Select>
-              
-              <Select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
-                <option value="idea">Idée</option>
-                <option value="bought">Acheté</option>
-                <option value="gifted">Offert</option>
-              </Select>
-              
-              <SaveButton onClick={save} disabled={!form.title.trim() || uploading}>
-                <FiSave size={18} /> {uploading ? 'Upload...' : (editing ? 'Sauvegarder' : 'Ajouter')}
-              </SaveButton>
-            </FormGrid>
+            <form onSubmit={handleSubmit}>
+              <FormGroup>
+                <Label>Titre *</Label>
+                <Input
+                  type="text"
+                  value={formData.title}
+                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                  required
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Description</Label>
+                <TextArea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  placeholder="Description de l'élément..."
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Lien URL</Label>
+                <Input
+                  type="url"
+                  value={formData.link_url}
+                  onChange={(e) => setFormData({ ...formData, link_url: e.target.value })}
+                  placeholder="https://..."
+                />
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Pour qui ?</Label>
+                <Select
+                  value={formData.recipient_id}
+                  onChange={(e) => setFormData({ ...formData, recipient_id: e.target.value })}
+                >
+                  <option value="">Moi</option>
+                  {couples.map(couple => (
+                    <option key={couple._id} value={couple._id}>{couple.name}</option>
+                  ))}
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Statut</Label>
+                <Select
+                  value={formData.status}
+                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                >
+                  <option value="idea">Idée</option>
+                  <option value="bought">Acheté</option>
+                  <option value="gifted">Offert</option>
+                </Select>
+              </FormGroup>
+
+              <FormGroup>
+                <Label>Images</Label>
+                {/* Images existantes */}
+                {existingImages.length > 0 && (
+                  <div style={{ marginBottom: 10 }}>
+                    <Label style={{ fontSize: '0.9em', color: '#666' }}>Images actuelles :</Label>
+                    <ImagePreview>
+                      {existingImages.map((img, index) => (
+                        <PreviewImage key={`existing-${index}`} src={getImageUrl(img)}>
+                          <RemoveImageButton type="button" onClick={() => removeExistingImage(index)}>
+                            ×
+                          </RemoveImageButton>
+                        </PreviewImage>
+                      ))}
+                    </ImagePreview>
+                  </div>
+                )}
+
+                <FileInputLabel>
+                  <FiUpload size={24} style={{ marginBottom: 8 }} />
+                  <div>Glisser-déposer ou cliquer pour ajouter</div>
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>JPG, PNG supportés</div>
+                  <HiddenInput
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                  />
+                </FileInputLabel>
+                {selectedImages.length > 0 && (
+                  <ImagePreview>
+                    {selectedImages.map((src, index) => (
+                      <PreviewImage key={index} src={src}>
+                        <RemoveImageButton type="button" onClick={() => removeImage(index)}>
+                          ×
+                        </RemoveImageButton>
+                      </PreviewImage>
+                    ))}
+                  </ImagePreview>
+                )}
+              </FormGroup>
+
+              <ModalActions>
+                <ModalButton type="button" className="secondary" onClick={handleCloseModal}>
+                  Annuler
+                </ModalButton>
+                <ModalButton type="submit" className="primary" disabled={!formData.title.trim()}>
+                  {editingItem ? 'Modifier' : 'Ajouter'}
+                </ModalButton>
+              </ModalActions>
+            </form>
           </ModalContent>
         </Modal>
+      )}
+
+      {viewingImages && (
+        <ImageGallery onClick={() => setViewingImages(null)}>
+          <CloseButton onClick={() => setViewingImages(null)}>×</CloseButton>
+          <GalleryImage
+            src={getImageUrl(viewingImages.images[currentImageIndex])}
+            alt="Wishlist item"
+          />
+          {viewingImages.images.length > 1 && (
+            <GalleryControls>
+              <GalleryButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(prev =>
+                    prev > 0 ? prev - 1 : viewingImages.images.length - 1
+                  );
+                }}
+              >
+                Précédent
+              </GalleryButton>
+              <GalleryButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setCurrentImageIndex(prev =>
+                    prev < viewingImages.images.length - 1 ? prev + 1 : 0
+                  );
+                }}
+              >
+                Suivant
+              </GalleryButton>
+            </GalleryControls>
+          )}
+        </ImageGallery>
       )}
     </Container>
   );
 }
+
+export default Wishlist;

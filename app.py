@@ -38,11 +38,16 @@ restaurants_col = db["restaurants"]
 activities_col  = db["activities"]
 wishlist_col    = db["wishlist_items"]
 photos_col      = db["photos"]
+albums_col      = db["albums"]
+memories_col    = db["memories"]
+comments_col    = db["comments"]
+reactions_col   = db["reactions"]
+settings_col    = db["settings"]
 notes_col       = db["notes"]
 push_subs_col   = db["push_subscriptions"]
 
 # CORS advanced (new Netlify domain + optional previews)
-_fallback_origins = "https://dreamy-kitten-9d113d.netlify.app,http://localhost:3000,https://dancing-chaja-15f8a5.netlify.app/"
+_fallback_origins = "https://dreamy-kitten-9d113d.netlify.app,http://localhost:3000"
 raw_origins = os.getenv("CORS_ORIGINS", _fallback_origins)
 origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 if os.getenv("ALLOW_NETLIFY_PREVIEWS", "false").lower() in ("1","true","yes"):
@@ -191,6 +196,38 @@ def get_users():
     users = list(users_col.find({}, {"password":0}).sort("joined_at", 1))
     return jsonify([serialize(u) for u in users])
 
+@app.get("/api/me")
+@jwt_required()
+def me_get():
+    u = current_user()
+    if not u: return {"error": "unauth"}, 401
+    return jsonify(serialize(u))
+
+@app.put("/api/me")
+@jwt_required()
+def me_update():
+    u = current_user()
+    if not u: return {"error": "unauth"}, 401
+    data = request.form if request.form else (request.get_json() or {})
+    
+    fields = {}
+    if "name" in data: fields["name"] = data["name"]
+    if "avatar_url" in data: fields["avatar_url"] = data["avatar_url"]
+    
+    # Handle direct file upload in PUT if present
+    if request.files and 'file' in request.files:
+        f = request.files['file']
+        if f:
+            url = save_file(f)
+            fields['avatar_url'] = url
+
+    if fields:
+        users_col.update_one({"_id": u["_id"]}, {"$set": fields})
+        u = users_col.find_one({"_id": u["_id"]})
+        
+    return jsonify(serialize(u))
+
+
 # ───────── Couple Management ─────────
 @app.post("/api/couple/create")
 @jwt_required()
@@ -230,45 +267,6 @@ def couple_join():
     users_col.update_one({"_id": u["_id"]}, {"$set": {"couple_id": c["_id"]}})
     return {"ok": True, "couple_id": str(c["_id"])}
 
-@app.get("/api/me")
-@jwt_required()
-def get_me():
-    u = current_user()
-    if not u:
-        return {"error": "unauth"}, 401
-    return {"_id": str(u["_id"]), "name": u["name"], "email": u["email"], "avatar_url": u.get("avatar_url",""), "couple_id": str(u.get("couple_id")) if u.get("couple_id") else None}
-
-@app.put("/api/me")
-@app.post("/api/me")
-@jwt_required()
-def update_me():
-    u = current_user()
-    if not u:
-        return {"error": "unauth"}, 401
-    # Support multipart for avatar upload
-    if request.content_type and 'multipart/form-data' in request.content_type:
-        f = request.files.get('file')
-        if not f:
-            return {"error": "no_file"}, 400
-        try:
-            url = save_file(f)
-            users_col.update_one({"_id": u["_id"]}, {"$set": {"avatar_url": url}})
-            return {"avatar_url": url}
-        except Exception as e:
-            return {"error": "upload_failed", "detail": str(e)}, 500
-    # JSON update (name / avatar_url)
-    data = request.get_json() or {}
-    fields = {}
-    if 'name' in data:
-        name = (data.get('name') or '').strip()
-        if name:
-            fields['name'] = name
-    if 'avatar_url' in data:
-        fields['avatar_url'] = data.get('avatar_url') or ''
-    if fields:
-        users_col.update_one({"_id": u["_id"]}, {"$set": fields})
-    return {"msg": "updated"}
-
 @app.get("/api/couple/me")
 @jwt_required()
 def couple_me():
@@ -278,7 +276,7 @@ def couple_me():
         return {"in_couple": False}
     c = couples_col.find_one({"_id": cid})
     members = list(users_col.find({"_id": {"$in": c["members"]}}, {"password":0}))
-    return {"in_couple": True, "couple_id": str(cid), "invite_code": c.get("invite_code"), "members": [{"_id": str(m["_id"]), "name": m["name"], "email": m["email"], "avatar_url": m.get("avatar_url","")} for m in members]}
+    return {"in_couple": True, "couple_id": str(cid), "invite_code": c.get("invite_code"), "members": [{"id": str(m["_id"]), "name": m["name"], "email": m["email"], "avatar_url": m.get("avatar_url","")} for m in members]}
 
 # ───────── Reminders ─────────
 @app.get("/api/reminders")
@@ -296,16 +294,7 @@ def reminders_create(u, cid):
     item = {"title": data["title"], "description": data.get("description",""), "created_by": str(u["_id"]), "assigned_to": data.get("assigned_to"), "priority": data.get("priority","normal"), "due_date": iso_to_dt(data.get("due_date")), "status": "pending", "created_at": dt.datetime.utcnow(), "couple_id": cid}
     res = reminders_col.insert_one(item); item["_id"]=str(res.inserted_id)
     try:
-        # Notification avec priorité selon l'urgence
-        priority_emoji = '🔴' if item['priority'] == 'urgent' else ('🟠' if item['priority'] == 'important' else '🔵')
-        payload = {
-            'type': 'reminder_created',
-            'title': f"{priority_emoji} Nouveau rappel",
-            'body': f"{item['title']}",
-            'url': '/reminders',
-            'priority': item['priority'],
-            'requireInteraction': item['priority'] == 'urgent'
-        }
+        payload = {'type': 'reminder_created','title': 'Nouveau rappel','body': f"{item['title']} (prio: {item['priority']})",'url': '/reminders'}
         broadcast_push(cid, u['email'], payload)
     except Exception as e:
         if DEBUG_PUSH: print('[PUSH][REMINDER][ERROR]', e)
@@ -350,11 +339,6 @@ def restaurants_create(u, cid):
     data = request.get_json() or {}
     item = {"name": data["name"], "address": data.get("address",""), "map_url": data.get("map_url",""), "image_url": data.get("image_url",""), "images": data.get("images", []), "status": data.get("status","to_try"), "notes": data.get("notes",""), "added_by": str(u["_id"]), "added_at": dt.datetime.utcnow(), "couple_id": cid}
     res = restaurants_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    try:
-        payload = {'type': 'restaurant_created','title': '🍽️ Nouveau restaurant','body': f"{item['name']}",'url': '/restaurants'}
-        broadcast_push(cid, u['email'], payload)
-    except Exception as e:
-        if DEBUG_PUSH: print('[PUSH][RESTAURANT][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/restaurants/<rid>")
@@ -396,11 +380,6 @@ def activities_create(u, cid):
     data = request.get_json() or {}
     item = {"title": data["title"], "category": data.get("category","other"), "status": data.get("status","planned"), "notes": data.get("notes",""), "images": data.get("images", []), "image_url": data.get("image_url",""), "added_by": str(u["_id"]), "added_at": dt.datetime.utcnow(), "couple_id": cid}
     res = activities_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    try:
-        payload = {'type': 'activity_created','title': '🎉 Nouvelle activité','body': f"{item['title']}",'url': '/'}
-        broadcast_push(cid, u['email'], payload)
-    except Exception as e:
-        if DEBUG_PUSH: print('[PUSH][ACTIVITY][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/activities/<aid>")
@@ -514,59 +493,32 @@ def wishlist_delete(u, cid, wid):
 # ───────── Photos ─────────
 @app.get("/api/photos")
 @jwt_required()
-def photos_list():
-    u = current_user()
-    if not u: return {"error":"unauth"}, 401
-    cid = u.get("couple_id")
-    # Si couple: photos du couple, sinon: photos perso
-    query = {"couple_id": cid} if cid else {"uploaded_by": str(u["_id"]), "couple_id": None}
-    items = list(photos_col.find(query).sort("uploaded_at",-1))
+@require_couple
+def photos_list(u, cid):
+    items = list(photos_col.find({"couple_id": cid}).sort("uploaded_at",-1))
     return jsonify([serialize(x) for x in items])
 
 @app.post("/api/photos")
 @jwt_required()
-def photos_create():
-    u = current_user()
-    if not u: return {"error":"unauth"}, 401
-    cid = u.get("couple_id")
+@require_couple
+def photos_create(u, cid):
     if request.content_type and 'multipart/form-data' in request.content_type:
         files = request.files.getlist('files')
         caption = request.form.get('caption','')
         album_id = request.form.get('album_id') or None
-        taken_at_str = request.form.get('taken_at','')
-        taken_at = None
-        if taken_at_str:
-            try:
-                taken_at = dt.datetime.fromisoformat(taken_at_str.replace('Z', '+00:00'))
-            except:
-                taken_at = None
         created = []
         for f in files:
             try:
                 url = save_file(f)
-                item = {"url": url, "caption": caption, "album_id": album_id, "taken_at": taken_at, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
+                item = {"url": url, "caption": caption, "album_id": album_id, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
                 res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
                 created.append(serialize(item))
             except Exception as e:
                 print('upload error', e)
-        # Notification pour les photos uploadées
-        if created and cid:
-            try:
-                count = len(created)
-                payload = {'type': 'photo_uploaded','title': '📸 Nouvelles photos','body': f"{count} photo{'s' if count > 1 else ''} ajoutée{'s' if count > 1 else ''}",'url': '/photos'}
-                broadcast_push(cid, u['email'], payload)
-            except Exception as e:
-                if DEBUG_PUSH: print('[PUSH][PHOTO][ERROR]', e)
         return jsonify(created), 201
     data = request.get_json() or {}
     if not data.get('url'): return {"error":"missing_url"}, 400
-    taken_at = None
-    if data.get('taken_at'):
-        try:
-            taken_at = dt.datetime.fromisoformat(data['taken_at'].replace('Z', '+00:00'))
-        except:
-            taken_at = None
-    item = {"url": data["url"], "caption": data.get("caption",""), "album_id": data.get("album_id"), "taken_at": taken_at, "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
+    item = {"url": data["url"], "caption": data.get("caption",""), "album_id": data.get("album_id"), "uploaded_by": str(u["_id"]), "uploaded_at": dt.datetime.utcnow(), "couple_id": cid}
     res = photos_col.insert_one(item); item["_id"]=str(res.inserted_id)
     return jsonify(serialize(item)), 201
 
@@ -575,13 +527,7 @@ def photos_create():
 @require_couple
 def photos_update(u, cid, pid):
     data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["caption","album_id","taken_at"]}
-    # Convert taken_at if present
-    if "taken_at" in fields and fields["taken_at"]:
-        try:
-            fields["taken_at"] = dt.datetime.fromisoformat(fields["taken_at"].replace('Z', '+00:00'))
-        except:
-            fields["taken_at"] = None
+    fields = {k: v for k,v in data.items() if k in ["caption","album_id"]}
     photos_col.update_one({"_id": oid(pid), "couple_id": cid}, {"$set": fields})
     return {"msg":"updated"}
 
@@ -602,42 +548,6 @@ def photos_delete(u, cid, pid):
         print('file delete err', e)
     return {"msg":"deleted"}
 
-# ───────── Albums ─────────
-@app.get("/api/albums")
-@jwt_required()
-@require_couple
-def albums_list(u, cid):
-    items = list(db["albums"].find({"couple_id": cid}).sort("created_at",-1))
-    return jsonify([serialize(x) for x in items])
-
-@app.post("/api/albums")
-@jwt_required()
-@require_couple
-def albums_create(u, cid):
-    data = request.get_json() or {}
-    if not data.get('title'): return {"error":"missing_title"}, 400
-    item = {"title": data["title"], "description": data.get("description",""), "cover_url": data.get("cover_url",""), "created_by": str(u["_id"]), "created_at": dt.datetime.utcnow(), "couple_id": cid}
-    res = db["albums"].insert_one(item); item["_id"]=str(res.inserted_id)
-    return jsonify(serialize(item)), 201
-
-@app.put("/api/albums/<aid>")
-@jwt_required()
-@require_couple
-def albums_update(u, cid, aid):
-    data = request.get_json() or {}
-    fields = {k: v for k,v in data.items() if k in ["title","description","cover_url"]}
-    db["albums"].update_one({"_id": oid(aid), "couple_id": cid}, {"$set": fields})
-    return {"msg":"updated"}
-
-@app.delete("/api/albums/<aid>")
-@jwt_required()
-@require_couple
-def albums_delete(u, cid, aid):
-    db["albums"].delete_one({"_id": oid(aid), "couple_id": cid})
-    # Optionally: remove album_id from all photos in this album
-    photos_col.update_many({"album_id": aid, "couple_id": cid}, {"$set": {"album_id": None}})
-    return {"msg":"deleted"}
-
 # ───────── Notes ─────────
 @app.get("/api/notes")
 @jwt_required()
@@ -653,12 +563,6 @@ def notes_create(u, cid):
     data = request.get_json() or {}
     item = {"content": data["content"], "pinned": bool(data.get("pinned", False)), "created_by": str(u["_id"]), "created_at": dt.datetime.utcnow(), "couple_id": cid}
     res = notes_col.insert_one(item); item["_id"]=str(res.inserted_id)
-    try:
-        preview = item['content'][:50] + ('...' if len(item['content']) > 50 else '')
-        payload = {'type': 'note_created','title': '📝 Nouvelle note','body': preview,'url': '/notes'}
-        broadcast_push(cid, u['email'], payload)
-    except Exception as e:
-        if DEBUG_PUSH: print('[PUSH][NOTE][ERROR]', e)
     return jsonify(serialize(item)), 201
 
 @app.put("/api/notes/<nid>")
@@ -720,6 +624,7 @@ def send_push(subscription, payload: dict):
             subscription_info=subscription,
             data=data_str,
             vapid_private_key=VAPID_PRIVATE_KEY,
+            vapid_public_key=VAPID_PUBLIC_KEY,
             vapid_claims={"sub": VAPID_SUBJECT}
         )
         return True, None
@@ -773,67 +678,202 @@ def broadcast_push(couple_id, author_email, payload: dict, exclude_author=True):
         if not ok and err and ('410' in err or 'expired' in err.lower()):
             push_subs_col.delete_one({'_id': s['_id']})
 
-# ───────── Reminder Notifications Scheduler ─────────
-import threading
-import time
+# ───────── Albums ─────────
+@app.get("/api/albums")
+@jwt_required()
+@require_couple
+def albums_list(u, cid):
+    items = list(albums_col.find({"couple_id": cid}).sort("created_at", -1))
+    return jsonify([serialize(x) for x in items])
 
-def check_due_reminders():
-    """Vérifie les rappels arrivés à échéance et envoie des notifications"""
-    while True:
-        try:
-            time.sleep(60)  # Vérifier toutes les minutes
-            now = dt.datetime.utcnow()
-            # Chercher les rappels dus dans les prochaines 5 minutes qui n'ont pas été notifiés
-            due_soon = now + dt.timedelta(minutes=5)
-            reminders = list(reminders_col.find({
-                "status": "pending",
-                "due_date": {"$lte": due_soon, "$gte": now},
-                "notified": {"$ne": True}
-            }))
-            
-            for reminder in reminders:
-                try:
-                    cid = reminder.get('couple_id')
-                    if not cid:
-                        continue
-                    
-                    # Marquer comme notifié
-                    reminders_col.update_one({"_id": reminder["_id"]}, {"$set": {"notified": True}})
-                    
-                    # Envoyer notification
-                    priority = reminder.get('priority', 'normal')
-                    priority_emoji = '🔴' if priority == 'urgent' else ('🟠' if priority == 'important' else '🔵')
-                    
-                    payload = {
-                        'type': 'reminder_due',
-                        'title': f"{priority_emoji} Rappel à échéance !",
-                        'body': reminder.get('title', 'Rappel'),
-                        'url': '/reminders',
-                        'priority': priority,
-                        'requireInteraction': priority == 'urgent',
-                        'tag': f"reminder-{str(reminder['_id'])}"
-                    }
-                    
-                    # Envoyer à TOUS les membres du couple (pas d'exclusion)
-                    if webpush and VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY:
-                        subs = list(push_subs_col.find({"couple_id": cid}))
-                        for s in subs:
-                            ok, err = send_push(s.get('subscription', {}), payload)
-                            if not ok and err and ('410' in err or 'expired' in err.lower()):
-                                push_subs_col.delete_one({'_id': s['_id']})
-                    
-                    if DEBUG_PUSH:
-                        print(f'[PUSH][REMINDER_DUE] Sent for: {reminder.get("title")}')
-                except Exception as e:
-                    if DEBUG_PUSH:
-                        print(f'[PUSH][REMINDER_DUE][ERROR] {e}')
-        except Exception as e:
-            if DEBUG_PUSH:
-                print(f'[PUSH][CHECK_DUE_REMINDERS][ERROR] {e}')
+@app.post("/api/albums")
+@jwt_required()
+@require_couple
+def albums_create(u, cid):
+    data = request.get_json() or {}
+    if not data.get("title"):
+        return {"error": "missing_title"}, 400
+    item = {
+        "title": data["title"],
+        "description": data.get("description", ""),
+        "created_by": str(u["_id"]),
+        "created_at": dt.datetime.utcnow(),
+        "couple_id": cid
+    }
+    res = albums_col.insert_one(item)
+    item["_id"] = str(res.inserted_id)
+    return jsonify(serialize(item)), 201
 
-# Démarrer le thread de vérification des rappels en arrière-plan
-reminder_thread = threading.Thread(target=check_due_reminders, daemon=True)
-reminder_thread.start()
+@app.delete("/api/albums/<aid>")
+@jwt_required()
+@require_couple
+def albums_delete(u, cid, aid):
+    albums_col.delete_one({"_id": oid(aid), "couple_id": cid})
+    # Detach photos from this album
+    photos_col.update_many({"album_id": aid, "couple_id": cid}, {"$set": {"album_id": None}})
+    return {"msg": "deleted"}
+
+# ───────── Memories ─────────
+@app.get("/api/memories")
+@jwt_required()
+@require_couple
+def memories_list(u, cid):
+    items = list(memories_col.find({"couple_id": cid}).sort("date", -1))
+    return jsonify([serialize(x) for x in items])
+
+@app.post("/api/memories")
+@jwt_required()
+@require_couple
+def memories_create(u, cid):
+    data = request.get_json() or {}
+    if not data.get("title"): return {"error": "missing_title"}, 400
+    
+    item = {
+        "title": data["title"],
+        "content": data.get("content", ""),
+        "date": iso_to_dt(data.get("date")) or dt.datetime.utcnow(),
+        "photo_url": data.get("photo_url", ""),
+        "created_by": str(u["_id"]),
+        "created_at": dt.datetime.utcnow(),
+        "couple_id": cid
+    }
+    res = memories_col.insert_one(item)
+    item["_id"] = str(res.inserted_id)
+    return jsonify(serialize(item)), 201
+
+@app.put("/api/memories/<mid>")
+@jwt_required()
+@require_couple
+def memories_update(u, cid, mid):
+    data = request.get_json() or {}
+    fields = {}
+    if "title" in data: fields["title"] = data["title"]
+    if "content" in data: fields["content"] = data["content"]
+    if "date" in data: fields["date"] = iso_to_dt(data["date"])
+    if "photo_url" in data: fields["photo_url"] = data["photo_url"]
+    
+    if fields:
+        memories_col.update_one({"_id": oid(mid), "couple_id": cid}, {"$set": fields})
+    return {"msg": "updated"}
+
+@app.delete("/api/memories/<mid>")
+@jwt_required()
+@require_couple
+def memories_delete(u, cid, mid):
+    memories_col.delete_one({"_id": oid(mid), "couple_id": cid})
+    return {"msg": "deleted"}
+
+# ───────── Comments ─────────
+@app.get("/api/comments")
+@jwt_required()
+@require_couple
+def comments_list(u, cid):
+    tt = request.args.get("target_type")
+    tid = request.args.get("target_id")
+    if not (tt and tid): return jsonify([])
+    items = list(comments_col.find({"couple_id": cid, "target_type": tt, "target_id": tid}).sort("created_at", 1))
+    return jsonify([serialize(x) for x in items])
+
+@app.post("/api/comments")
+@jwt_required()
+@require_couple
+def comments_create(u, cid):
+    data = request.get_json() or {}
+    if not (data.get("target_type") and data.get("target_id") and data.get("content")):
+        return {"error": "missing_fields"}, 400
+    
+    item = {
+        "target_type": data["target_type"],
+        "target_id": data["target_id"],
+        "content": data["content"],
+        "created_by": str(u["_id"]),
+        "created_at": dt.datetime.utcnow(),
+        "couple_id": cid
+    }
+    res = comments_col.insert_one(item)
+    item["_id"] = str(res.inserted_id)
+    return jsonify(serialize(item)), 201
+
+@app.delete("/api/comments/<comment_id>")
+@jwt_required()
+@require_couple
+def comments_delete(u, cid, comment_id):
+    comments_col.delete_one({"_id": oid(comment_id), "couple_id": cid})
+    return {"msg": "deleted"}
+
+# ───────── Reactions ─────────
+@app.get("/api/reactions")
+@jwt_required()
+@require_couple
+def reactions_list(u, cid):
+    tt = request.args.get("target_type")
+    tid = request.args.get("target_id")
+    if not (tt and tid): return jsonify([])
+    items = list(reactions_col.find({"couple_id": cid, "target_type": tt, "target_id": tid}))
+    return jsonify([serialize(x) for x in items])
+
+@app.post("/api/reactions")
+@jwt_required()
+@require_couple
+def reactions_toggle(u, cid):
+    data = request.get_json() or {}
+    if not (data.get("target_type") and data.get("target_id") and data.get("emoji")):
+        return {"error": "missing_fields"}, 400
+    
+    query = {
+        "couple_id": cid,
+        "target_type": data["target_type"],
+        "target_id": data["target_id"],
+        "emoji": data["emoji"],
+        "created_by": str(u["_id"])
+    }
+    
+    existing = reactions_col.find_one(query)
+    if existing:
+        reactions_col.delete_one({"_id": existing["_id"]})
+        return {"action": "removed"}
+    else:
+        item = query.copy()
+        item["created_at"] = dt.datetime.utcnow()
+        reactions_col.insert_one(item)
+        return {"action": "added"}
+
+# ───────── Settings ─────────
+@app.get("/api/settings")
+@jwt_required()
+def settings_get():
+    u = current_user()
+    if not u: return {"error": "unauth"}, 401
+    
+    s = settings_col.find_one({"user_id": str(u["_id"])})
+    if not s:
+        # Return defaults
+        return jsonify({
+            "theme": "dark",
+            "notifications_enabled": True,
+            "language": "fr"
+        })
+    return jsonify(serialize(s))
+
+@app.put("/api/settings")
+@jwt_required()
+def settings_update():
+    u = current_user()
+    if not u: return {"error": "unauth"}, 401
+    
+    data = request.get_json() or {}
+    fields = {}
+    if "theme" in data: fields["theme"] = data["theme"]
+    if "notifications_enabled" in data: fields["notifications_enabled"] = bool(data["notifications_enabled"])
+    if "language" in data: fields["language"] = data["language"]
+    
+    if fields:
+        settings_col.update_one(
+            {"user_id": str(u["_id"])},
+            {"$set": fields, "$setOnInsert": {"user_id": str(u["_id"])}},
+            upsert=True
+        )
+    return {"msg": "updated"}
 
 # ───────── Entrypoint ─────────
 if __name__ == "__main__":

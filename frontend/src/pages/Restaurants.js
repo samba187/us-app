@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
-import { FiPlus, FiMapPin, FiExternalLink, FiTrash2, FiEdit2, FiX, FiSave, FiImage } from 'react-icons/fi';
+import { FiPlus, FiMapPin, FiTrash2, FiEdit2, FiX, FiSave, FiFilter, FiExternalLink, FiUpload } from 'react-icons/fi';
 import { authService } from '../services/authService';
 
 const fadeIn = keyframes`
@@ -59,6 +59,34 @@ const AddButton = styled.button`
   }
 `;
 
+const Button = styled.button`
+  padding: 12px 24px;
+  border: none;
+  border-radius: 12px;
+  background: ${p => p.variant === 'primary' ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))' : 'rgba(255, 255, 255, 0.1)'};
+  color: ${p => p.variant === 'primary' ? '#fff' : 'var(--text-color)'};
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: ${p => p.variant === 'primary' ? '0 6px 20px rgba(124, 58, 237, 0.4)' : 'none'};
+    background: ${p => p.variant === 'primary' ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))' : 'rgba(255, 255, 255, 0.15)'};
+  }
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
@@ -70,8 +98,8 @@ const Grid = styled.div`
 `;
 
 const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 20px;
   overflow: hidden;
   box-shadow: 0 8px 28px rgba(0,0,0,0.2);
@@ -146,8 +174,8 @@ const StatusBadge = styled.div`
   color: #fff;
   background: ${p =>
     p.status === 'visited' ? 'rgba(16, 185, 129, 0.9)' :
-    p.status === 'favorite' ? 'rgba(255, 107, 138, 0.9)' :
-    'rgba(52, 152, 219, 0.9)'
+      p.status === 'favorite' ? 'rgba(255, 107, 138, 0.9)' :
+        'rgba(52, 152, 219, 0.9)'
   };
 `;
 
@@ -245,6 +273,14 @@ const ModalContent = styled.div`
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
   }
+
+  @media (max-width: 768px) {
+    padding: 16px;
+    border-radius: 12px;
+    max-height: 95vh;
+    max-width: 95vw;
+    margin: 0 auto;
+  }
 `;
 
 const ModalHeader = styled.div`
@@ -280,6 +316,38 @@ const CloseButton = styled.button`
 const FormGrid = styled.div`
   display: grid;
   gap: 14px;
+`;
+
+const HiddenInput = styled.input`
+  display: none;
+`;
+
+const FileInputLabel = styled.label`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  border: 2px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: all 0.2s;
+  color: var(--text-color);
+  text-align: center;
+  margin-bottom: 16px;
+
+  &:hover {
+    border-color: var(--primary-color);
+    background: rgba(255, 255, 255, 0.08);
+  }
+`;
+
+const Label = styled.label`
+  display: block;
+  font-size: 14px;
+  color: var(--muted-text);
+  margin-bottom: 8px;
 `;
 
 const Input = styled.input`
@@ -335,8 +403,6 @@ const Select = styled.select`
     border-color: var(--neon-1);
     box-shadow: 0 0 0 4px rgba(124, 58, 237, 0.12);
   }
-<<<<<<< HEAD
-
   option {
     background: #1a1d2e;
     color: var(--text-color);
@@ -347,8 +413,6 @@ const Select = styled.select`
     background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
     color: #fff;
   }
-=======
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
 `;
 
 const SaveButton = styled.button`
@@ -492,18 +556,18 @@ const ViewBadge = styled.div`
   margin-bottom: 16px;
   background: ${p =>
     p.status === 'visited' ? 'rgba(16, 185, 129, 0.2)' :
-    p.status === 'favorite' ? 'rgba(255, 107, 138, 0.2)' :
-    'rgba(52, 152, 219, 0.2)'
+      p.status === 'favorite' ? 'rgba(255, 107, 138, 0.2)' :
+        'rgba(52, 152, 219, 0.2)'
   };
   color: ${p =>
     p.status === 'visited' ? '#10b981' :
-    p.status === 'favorite' ? 'var(--neon-3)' :
-    '#3498db'
+      p.status === 'favorite' ? 'var(--neon-3)' :
+        '#3498db'
   };
   border: 1px solid ${p =>
     p.status === 'visited' ? 'rgba(16, 185, 129, 0.3)' :
-    p.status === 'favorite' ? 'rgba(255, 107, 138, 0.3)' :
-    'rgba(52, 152, 219, 0.3)'
+      p.status === 'favorite' ? 'rgba(255, 107, 138, 0.3)' :
+        'rgba(52, 152, 219, 0.3)'
   };
 `;
 
@@ -540,7 +604,7 @@ const ViewActionButton = styled.button`
   padding: 14px 20px;
   border: none;
   border-radius: 12px;
-  background: ${p => p.variant === 'primary' 
+  background: ${p => p.variant === 'primary'
     ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))'
     : 'rgba(255, 255, 255, 0.06)'
   };
@@ -595,12 +659,19 @@ export default function Restaurants() {
   const openModal = (item = null) => {
     if (item) {
       setEditing(item._id);
+
+      // Gestion de la compatibilité : si pas d'images dans le tableau mais une image_url, on l'ajoute
+      let initialImages = item.images || [];
+      if (initialImages.length === 0 && item.image_url) {
+        initialImages = [item.image_url];
+      }
+
       setForm({
         name: item.name || '',
         address: item.address || '',
         map_url: item.map_url || '',
         image_url: item.image_url || '',
-        images: item.images || [],
+        images: initialImages,
         status: item.status || 'to_try',
         notes: item.notes || ''
       });
@@ -623,9 +694,9 @@ export default function Restaurants() {
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    
+
     setImageFiles(files);
-    
+
     // Générer les previews
     const newPreviews = [];
     files.forEach((file) => {
@@ -662,25 +733,26 @@ export default function Restaurants() {
       // Upload des nouvelles images si fichiers sélectionnés
       if (imageFiles.length > 0) {
         console.log(`Uploading ${imageFiles.length} restaurant image(s)...`);
-        const uploaded = await authService.photoService.uploadMultipart(imageFiles);
-        console.log('Upload response:', uploaded);
-        if (uploaded && uploaded.length > 0) {
-          const newImageUrls = uploaded.map(img => img.url);
-          finalImages = [...finalImages, ...newImageUrls];
+        // Use generic upload
+        const urls = await authService.photoService.uploadGeneric(imageFiles);
+        console.log('Upload response:', urls);
+        if (urls && urls.length > 0) {
+          finalImages = [...finalImages, ...urls];
           console.log('Final restaurant images:', finalImages);
         }
       }
 
-      // Si pas d'images dans le tableau mais image_url défini, mettre image_url comme première image
-      let finalImageUrl = form.image_url;
-      if (finalImages.length > 0 && !finalImageUrl) {
+
+      // Mise à jour de l'image principale (cover)
+      let finalImageUrl = '';
+      if (finalImages.length > 0) {
         finalImageUrl = finalImages[0];
       }
 
-      const payload = { 
-        ...form, 
+      const payload = {
+        ...form,
         image_url: finalImageUrl,
-        images: finalImages 
+        images: finalImages
       };
       console.log('Saving restaurant with payload:', payload);
 
@@ -742,47 +814,47 @@ export default function Restaurants() {
         <Grid>
           {items.map(item => (
             <Card key={item._id}>
-            <RestaurantImage 
-              image={getImageUrl(item.image_url)}
-              onClick={() => setViewingItem(item)}
-            >
-              <StatusBadge status={item.status}>
-                {getStatusLabel(item.status)}
-              </StatusBadge>
-            </RestaurantImage>
-            <RestaurantContent>
-              <RestaurantName>{item.name}</RestaurantName>
-              {item.address && (
-                <RestaurantAddress>
-                  <FiMapPin size={14} />
-                  {item.address}
-                </RestaurantAddress>
-              )}
-              {item.notes && <RestaurantNotes>{item.notes}</RestaurantNotes>}
-              <Actions>
-                {item.map_url && (
-                  <ActionButton as="a" href={item.map_url} target="_blank" rel="noopener noreferrer">
-                    <FiMapPin /> Carte
-                  </ActionButton>
+              <RestaurantImage
+                image={getImageUrl(item.image_url)}
+                onClick={() => setViewingItem(item)}
+              >
+                <StatusBadge status={item.status}>
+                  {getStatusLabel(item.status)}
+                </StatusBadge>
+              </RestaurantImage>
+              <RestaurantContent>
+                <RestaurantName>{item.name}</RestaurantName>
+                {item.address && (
+                  <RestaurantAddress>
+                    <FiMapPin size={14} />
+                    {item.address}
+                  </RestaurantAddress>
                 )}
-                <ActionButton onClick={() => openModal(item)}>
-                  <FiEdit2 /> Modifier
-                </ActionButton>
-                <DeleteButton onClick={() => remove(item._id)}>
-                  <FiTrash2 /> Supprimer
-                </DeleteButton>
-              </Actions>
-            </RestaurantContent>
-          </Card>
+                {item.notes && <RestaurantNotes>{item.notes}</RestaurantNotes>}
+                <Actions>
+                  {item.map_url && (
+                    <ActionButton as="a" href={item.map_url} target="_blank" rel="noopener noreferrer">
+                      <FiMapPin /> Carte
+                    </ActionButton>
+                  )}
+                  <ActionButton onClick={() => openModal(item)}>
+                    <FiEdit2 /> Modifier
+                  </ActionButton>
+                  <DeleteButton onClick={() => remove(item._id)}>
+                    <FiTrash2 /> Supprimer
+                  </DeleteButton>
+                </Actions>
+              </RestaurantContent>
+            </Card>
           ))}
         </Grid>
       )}
 
       {viewingItem && (() => {
-        const allImages = viewingItem.images && viewingItem.images.length > 0 
-          ? viewingItem.images 
-          : viewingItem.image_url 
-            ? [viewingItem.image_url] 
+        const allImages = viewingItem.images && viewingItem.images.length > 0
+          ? viewingItem.images
+          : viewingItem.image_url
+            ? [viewingItem.image_url]
             : [];
         const currentImage = allImages[currentImageIndex] || null;
 
@@ -896,13 +968,13 @@ export default function Restaurants() {
                     <div style={{ fontSize: 13, color: 'var(--muted-text)', marginBottom: 12 }}>Toutes les photos ({allImages.length})</div>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8 }}>
                       {allImages.map((img, idx) => (
-                        <div 
-                          key={idx} 
+                        <div
+                          key={idx}
                           onClick={() => setCurrentImageIndex(idx)}
-                          style={{ 
-                            width: '100%', 
+                          style={{
+                            width: '100%',
                             paddingTop: '100%',
-                            borderRadius: 8, 
+                            borderRadius: 8,
                             overflow: 'hidden',
                             background: `url(${getImageUrl(img)})`,
                             backgroundSize: 'cover',
@@ -911,7 +983,7 @@ export default function Restaurants() {
                             border: currentImageIndex === idx ? '3px solid var(--primary-color)' : '2px solid rgba(255, 255, 255, 0.1)',
                             transition: 'all 0.2s ease',
                             opacity: currentImageIndex === idx ? 1 : 0.6
-                          }} 
+                          }}
                         />
                       ))}
                     </div>
@@ -920,10 +992,10 @@ export default function Restaurants() {
 
                 <ViewActions>
                   {viewingItem.map_url && (
-                    <ViewActionButton 
-                      as="a" 
-                      href={viewingItem.map_url} 
-                      target="_blank" 
+                    <ViewActionButton
+                      as="a"
+                      href={viewingItem.map_url}
+                      target="_blank"
                       rel="noopener noreferrer"
                       variant="primary"
                     >
@@ -953,42 +1025,36 @@ export default function Restaurants() {
               </CloseButton>
             </ModalHeader>
             <FormGrid>
-              <Input
-                placeholder="Nom du restaurant *"
-                value={form.name}
-                onChange={e => setForm({ ...form, name: e.target.value })}
-              />
-              <Input
-                placeholder="Adresse"
-                value={form.address}
-                onChange={e => setForm({ ...form, address: e.target.value })}
-              />
-              <Input
-                placeholder="Lien Google Maps"
-                value={form.map_url}
-                onChange={e => setForm({ ...form, map_url: e.target.value })}
-              />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                <label style={{ 
-                  padding: '14px 20px', 
-                  background: 'rgba(124, 58, 237, 0.15)', 
-                  border: '2px dashed rgba(124, 58, 237, 0.4)', 
-                  borderRadius: 12, 
-                  cursor: 'pointer',
-                  textAlign: 'center',
-                  color: 'var(--text-color)',
-                  fontWeight: 600,
-                  transition: 'all 0.3s ease'
-                }}>
-                  <input 
-                    type="file" 
-                    accept="image/*"
-                    multiple
-                    style={{ display: 'none' }} 
-                    onChange={handleImageSelect}
-                  />
-                  📸 {imageFiles.length > 0 ? `${imageFiles.length} image(s) sélectionnée(s)` : 'Choisir des images'}
-                </label>
+                <Input
+                  placeholder="Nom du restaurant *"
+                  value={form.name}
+                  onChange={e => setForm({ ...form, name: e.target.value })}
+                />
+                <Input
+                  placeholder="Adresse"
+                  value={form.address}
+                  onChange={e => setForm({ ...form, address: e.target.value })}
+                />
+                <Input
+                  placeholder="Lien Google Maps"
+                  value={form.map_url}
+                  onChange={e => setForm({ ...form, map_url: e.target.value })}
+                />
+                <div style={{ marginBottom: 16 }}>
+                  <Label>Photos</Label>
+                  <FileInputLabel>
+                    <FiUpload size={24} style={{ marginBottom: 8 }} />
+                    <div>Ajouter des photos</div>
+                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>JPG, PNG</div>
+                    <HiddenInput
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleImageSelect}
+                    />
+                  </FileInputLabel>
+                </div>
 
                 {/* Images existantes (mode édition) */}
                 {form.images && form.images.length > 0 && (
@@ -997,10 +1063,10 @@ export default function Restaurants() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
                       {form.images.map((img, idx) => (
                         <div key={idx} style={{ position: 'relative' }}>
-                          <div style={{ 
-                            width: '100%', 
+                          <div style={{
+                            width: '100%',
                             paddingTop: '100%',
-                            borderRadius: 8, 
+                            borderRadius: 8,
                             overflow: 'hidden',
                             background: `url(${getImageUrl(img)})`,
                             backgroundSize: 'cover',
@@ -1040,10 +1106,10 @@ export default function Restaurants() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
                       {imagePreviews.map((preview, idx) => (
                         <div key={idx} style={{ position: 'relative' }}>
-                          <div style={{ 
-                            width: '100%', 
+                          <div style={{
+                            width: '100%',
                             paddingTop: '100%',
-                            borderRadius: 8, 
+                            borderRadius: 8,
                             overflow: 'hidden',
                             background: `url(${preview})`,
                             backgroundSize: 'cover',
@@ -1093,13 +1159,17 @@ export default function Restaurants() {
                 value={form.notes}
                 onChange={e => setForm({ ...form, notes: e.target.value })}
               />
-              <SaveButton onClick={save} disabled={uploading}>
-                <FiSave /> {uploading ? 'Upload en cours...' : editing ? 'Sauvegarder' : 'Ajouter'}
-              </SaveButton>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12, marginTop: 24 }}>
+                <Button type="button" onClick={() => setShowModal(false)} style={{ background: 'transparent' }}>Annuler</Button>
+                <Button onClick={save} disabled={uploading} variant="primary">
+                  {uploading ? 'Upload en cours...' : editing ? 'Sauvegarder' : 'Ajouter'}
+                </Button>
+              </div>
             </FormGrid>
           </ModalContent>
         </Modal>
-      )}
-    </Container>
+      )
+      }
+    </Container >
   );
 }

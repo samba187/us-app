@@ -27,8 +27,8 @@ const Title = styled.h1`
 `;
 
 const Card = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 18px;
   padding: 20px;
   box-shadow: 0 6px 20px rgba(0,0,0,0.15);
@@ -86,7 +86,6 @@ const Select = styled.select`
     box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.12);
   }
 
-<<<<<<< HEAD
   option {
     background: #1a1d2e;
     color: var(--text-color);
@@ -97,9 +96,6 @@ const Select = styled.select`
     background: linear-gradient(135deg, var(--neon-1), var(--neon-3));
     color: #fff;
   }
-
-=======
->>>>>>> 8435e37dedd427f4484f92ef50a73d45c7720fcc
   @media (max-width: 768px) {
     width: 100%;
   }
@@ -174,7 +170,7 @@ const Avatar = styled.div`
   height: 72px;
   border-radius: 50%;
   border: 2px solid rgba(255,255,255,0.15);
-  background: ${({src}) => src ? `url(${src}) center/cover no-repeat` : 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(255,107,138,0.4))'};
+  background: ${({ src }) => src ? `url(${src}) center/cover no-repeat` : 'linear-gradient(135deg, rgba(124,58,237,0.4), rgba(255,107,138,0.4))'};
 `;
 
 const SmallButton = styled.button`
@@ -218,7 +214,7 @@ const AvatarGrid = styled.div`
 const AvatarOption = styled.button`
   width:100%; padding-top:100%; position:relative; border:none; border-radius:14px; cursor:pointer; overflow:hidden;
   background: #111;
-  &:after{ content:''; position:absolute; inset:0; background:${({src})=>`url(${src}) center/cover no-repeat`}; }
+  &:after{ content:''; position:absolute; inset:0; background:${({ src }) => `url(${src}) center/cover no-repeat`}; }
   &.active { outline: 3px solid var(--neon-1); }
 `;
 
@@ -232,13 +228,32 @@ export default function Profile() {
   const [uploadPreview, setUploadPreview] = useState(null);
   const API_BASE = process.env.REACT_APP_API_BASE || 'http://localhost:5000';
 
+  // Load settings from backend
+  useEffect(() => {
+    authService.api.get('/api/settings')
+      .then(res => {
+        if (res.data) {
+          if (res.data.theme) {
+            setTheme(res.data.theme);
+            localStorage.setItem('theme', res.data.theme);
+            document.documentElement.setAttribute('data-theme', res.data.theme === 'dark' ? 'dark' : 'light');
+          }
+          if (res.data.language) {
+            setLang(res.data.language);
+            localStorage.setItem('lang', res.data.language);
+          }
+        }
+      })
+      .catch(err => console.log('Settings load error', err));
+  }, []);
+
   const absoluteUrl = (url) => {
     if (!url) return '';
     return url.startsWith('http') ? url : `${API_BASE}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   const presetAvatars = useMemo(() => {
-    const seeds = ['Nova','Luna','Orion','Vega','Atlas','Iris','Cosmo','Milo','Nora','Rex','Zoe','Leo'];
+    const seeds = ['Nova', 'Luna', 'Orion', 'Vega', 'Atlas', 'Iris', 'Cosmo', 'Milo', 'Nora', 'Rex', 'Zoe', 'Leo'];
     return seeds.map(s => `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(s)}&backgroundColor=transparent`);
   }, []);
 
@@ -266,12 +281,16 @@ export default function Profile() {
     setTheme(next);
     localStorage.setItem('theme', next);
     document.documentElement.setAttribute('data-theme', next === 'dark' ? 'dark' : 'light');
+    // Save to backend
+    authService.api.put('/api/settings', { theme: next }).catch(() => { });
   };
 
   const onLangChange = (e) => {
     const v = e.target.value;
     setLang(v);
     localStorage.setItem('lang', v);
+    // Save to backend
+    authService.api.put('/api/settings', { language: v }).catch(() => { });
   };
 
   const logout = () => {
@@ -293,22 +312,22 @@ export default function Profile() {
     if (!uploadFile) return;
     try {
       const res = await authService.me.uploadAvatar(uploadFile);
-      setMe(m => ({...m, avatar_url: res.avatar_url}));
+      setMe(m => ({ ...m, avatar_url: res.avatar_url }));
       closeAvatarModal();
     } catch (e) { alert("Échec de l'upload"); }
   };
   const choosePreset = async (url) => {
     try {
       await authService.me.update({ avatar_url: url });
-      setMe(m => ({...m, avatar_url: url}));
+      setMe(m => ({ ...m, avatar_url: url }));
       closeAvatarModal();
     } catch (e) { alert('Impossible de mettre à jour'); }
   };
   const removeAvatar = async () => {
     try {
       await authService.me.update({ avatar_url: '' });
-      setMe(m => ({...m, avatar_url: ''}));
-    } catch (e) {}
+      setMe(m => ({ ...m, avatar_url: '' }));
+    } catch (e) { }
   };
 
   return (
@@ -316,7 +335,7 @@ export default function Profile() {
       <Title>Profil</Title>
 
       <Card>
-        <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', gap:12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <AvatarWrap>
             <Avatar src={absoluteUrl(me?.avatar_url)} />
             <div>
@@ -324,7 +343,7 @@ export default function Profile() {
               <LabelSubtitle>Utilisez votre photo ou un avatar stylé</LabelSubtitle>
             </div>
           </AvatarWrap>
-          <div style={{display:'flex', gap:8}}>
+          <div style={{ display: 'flex', gap: 8 }}>
             <SmallButton onClick={openAvatarModal}><FiImage /> Changer</SmallButton>
             {me?.avatar_url ? (
               <SmallButton onClick={removeAvatar}><FiX /> Retirer</SmallButton>
@@ -334,7 +353,7 @@ export default function Profile() {
       </Card>
 
       {showAvatarModal && (
-        <Modal onClick={(e)=> e.target===e.currentTarget && closeAvatarModal()}>
+        <Modal onClick={(e) => e.target === e.currentTarget && closeAvatarModal()}>
           <ModalCard>
             <ModalHeader>
               <LabelTitle>Mettre à jour l'avatar</LabelTitle>
@@ -344,14 +363,14 @@ export default function Profile() {
               <div>
                 <LabelTitle>Uploader une photo</LabelTitle>
                 <FileBox>
-                  <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:8}}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
                     <FiUpload />
                     <div>Sélectionner une image</div>
                   </div>
                   <HiddenInput type="file" accept="image/*" onChange={onFile} />
                 </FileBox>
                 {uploadPreview && (
-                  <div style={{display:'flex', alignItems:'center', gap:12, marginTop:12}}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12 }}>
                     <Avatar src={uploadPreview} />
                     <Button onClick={saveUploadedAvatar}><FiCheck /> Enregistrer</Button>
                   </div>
@@ -360,8 +379,8 @@ export default function Profile() {
               <div>
                 <LabelTitle>Ou choisissez un avatar</LabelTitle>
                 <AvatarGrid>
-                  {presetAvatars.map((u,i)=> (
-                    <AvatarOption key={i} src={u} className={me?.avatar_url===u ? 'active' : ''} onClick={()=>choosePreset(u)} />
+                  {presetAvatars.map((u, i) => (
+                    <AvatarOption key={i} src={u} className={me?.avatar_url === u ? 'active' : ''} onClick={() => choosePreset(u)} />
                   ))}
                 </AvatarGrid>
               </div>
@@ -400,19 +419,6 @@ export default function Profile() {
       <Card>
         <Row>
           <Label>
-            <LabelTitle>Langue</LabelTitle>
-            <LabelSubtitle>Choisissez votre langue d'interface</LabelSubtitle>
-          </Label>
-          <Select value={lang} onChange={onLangChange}>
-            <option value="fr">Français</option>
-            <option value="en">English</option>
-          </Select>
-        </Row>
-      </Card>
-
-      <Card>
-        <Row>
-          <Label>
             <LabelTitle>Apparence</LabelTitle>
             <LabelSubtitle>Mode {theme === 'dark' ? 'sombre' : 'clair'}</LabelSubtitle>
           </Label>
@@ -439,3 +445,4 @@ export default function Profile() {
     </Container>
   );
 }
+

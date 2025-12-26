@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import styled, { keyframes } from 'styled-components';
 import { FiUpload, FiImage, FiX, FiSave, FiFolder, FiPlus, FiEdit2, FiTrash2, FiDownload, FiCalendar, FiMessageSquare } from 'react-icons/fi';
 import { authService } from '../services/authService';
+import CommentsSection from '../components/CommentsSection';
+import ReactionsBar from '../components/ReactionsBar';
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -51,10 +53,11 @@ const Button = styled.button`
   padding: 12px 24px;
   border: none;
   border-radius: 12px;
-  background: ${p => p.variant === 'primary' 
+  background: ${p => p.variant === 'primary'
     ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))'
-    : 'rgba(255, 255, 255, 0.06)'
+    : 'var(--card-bg)'
   };
+  border: 1px solid ${p => p.variant === 'primary' ? 'transparent' : 'var(--border-color)'};
   color: #fff;
   font-size: 15px;
   font-weight: 600;
@@ -124,8 +127,8 @@ const Grid = styled.div`
 `;
 
 const AlbumCard = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 16px;
   overflow: hidden;
   cursor: pointer;
@@ -176,8 +179,8 @@ const AlbumMeta = styled.div`
 `;
 
 const PhotoCard = styled.div`
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--card-bg);
+  border: 1px solid var(--border-color);
   border-radius: 14px;
   overflow: hidden;
   cursor: pointer;
@@ -598,7 +601,7 @@ const ViewerActionButton = styled.button`
   padding: 12px;
   border: none;
   border-radius: 12px;
-  background: ${p => p.variant === 'primary' 
+  background: ${p => p.variant === 'primary'
     ? 'linear-gradient(135deg, var(--neon-1), var(--neon-3))'
     : 'rgba(255, 255, 255, 0.06)'
   };
@@ -631,13 +634,13 @@ export default function Photos() {
   const [photos, setPhotos] = useState([]);
   const [currentAlbum, setCurrentAlbum] = useState(null);
   const [loading, setLoading] = useState(true);
-  
+
   // Modals
   const [showAlbumModal, setShowAlbumModal] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [viewingPhoto, setViewingPhoto] = useState(null);
   const [editingPhoto, setEditingPhoto] = useState(null);
-  
+
   // Forms
   const [albumForm, setAlbumForm] = useState({ title: '', description: '' });
   const [uploadFiles, setUploadFiles] = useState([]);
@@ -713,9 +716,9 @@ export default function Photos() {
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
-    
+
     setUploadFiles(files);
-    
+
     const newPreviews = [];
     files.forEach((file) => {
       const reader = new FileReader();
@@ -761,7 +764,7 @@ export default function Photos() {
       setUploadDate('');
       setUploadAlbum('');
       setShowUploadModal(false);
-      
+
       if (currentAlbum) {
         await loadPhotos(currentAlbum._id);
       } else {
@@ -830,8 +833,8 @@ export default function Photos() {
   const displayedPhotos = currentAlbum
     ? photos.filter(p => p.album_id === currentAlbum._id)
     : view === 'all'
-    ? photos
-    : [];
+      ? photos
+      : [];
 
   return (
     <Container>
@@ -1052,6 +1055,10 @@ export default function Photos() {
                   Uploadée le {new Date(viewingPhoto.uploaded_at).toLocaleDateString('fr-FR')}
                 </ViewerMeta>
               )}
+
+              <ReactionsBar targetType="photo" targetId={viewingPhoto._id} />
+              <CommentsSection targetType="photo" targetId={viewingPhoto._id} />
+
               <ViewerActions>
                 <ViewerActionButton variant="primary" onClick={() => downloadPhoto(viewingPhoto.url)}>
                   <FiDownload /> Télécharger
