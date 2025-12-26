@@ -47,7 +47,7 @@ notes_col       = db["notes"]
 push_subs_col   = db["push_subscriptions"]
 
 # CORS advanced (new Netlify domain + optional previews)
-_fallback_origins = "https://dreamy-kitten-9d113d.netlify.app,http://localhost:3000"
+_fallback_origins = "https://dreamy-kitten-9d113d.netlify.app,http://localhost:3000,https://us-app-c88e.vercel.app/"
 raw_origins = os.getenv("CORS_ORIGINS", _fallback_origins)
 origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 if os.getenv("ALLOW_NETLIFY_PREVIEWS", "false").lower() in ("1","true","yes"):
